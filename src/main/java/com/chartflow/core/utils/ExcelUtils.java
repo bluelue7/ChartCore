@@ -45,13 +45,16 @@ public class ExcelUtils {
             log.error("表格处理错误", e);
         }
         if (CollUtil.isEmpty(list)) {
-            return "";
+            return ""; //没有数据 直接返回空
         }
         // 转换为 csv
         StringBuilder stringBuilder = new StringBuilder();
         // 读取表头
         LinkedHashMap<Integer, String> headerMap = (LinkedHashMap) list.get(0);
-        List<String> headerList = headerMap.values().stream().filter(ObjectUtils::isNotEmpty).collect(Collectors.toList());
+        List<String> headerList = headerMap.values()
+                .stream()
+                .filter(ObjectUtils::isNotEmpty)
+                .collect(Collectors.toList()); //过滤空数据
         stringBuilder.append(StringUtils.join(headerList, ",")).append("\n");
         // 读取数据
         for (int i = 1; i < list.size(); i++) {
