@@ -95,3 +95,7 @@ logging:
       max-history: 30        # 保留最近30天的日志
       total-size-cap: 1GB    # 所有日志文件总大小上限
       file-name-pattern: logs/application-%d{yyyy-MM-dd}.%i.log
+
+ollama:
+  base-url: http://localhost:11434/v1
+  model: qwen2.5:7b

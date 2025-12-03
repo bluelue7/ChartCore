@@ -12,11 +12,13 @@ import com.chartflow.core.constant.CommonConstant;
 import com.chartflow.core.constant.UserConstant;
 import com.chartflow.core.exception.BusinessException;
 import com.chartflow.core.exception.ThrowUtils;
+import com.chartflow.core.manager.AiManager;
 import com.chartflow.core.model.dto.chart.*;
 import com.chartflow.core.model.entity.Chart;
 import com.chartflow.core.model.entity.User;
 import com.chartflow.core.model.vo.BiResponse;
 import com.chartflow.core.service.ChartService;
+import com.chartflow.core.service.LocalAiService;
 import com.chartflow.core.service.UserService;
 import com.chartflow.core.utils.ExcelUtils;
 import com.chartflow.core.utils.SqlUtils;
@@ -51,8 +53,8 @@ public class ChartController {
     @Resource
     private UserService userService;
 
-//    @Resource
-//    private AiManager aiManager;
+    @Resource
+    private AiManager aiManager;
 
 //    @Resource
 //    private RedisLimiterManager redisLimiterManager;
@@ -63,8 +65,8 @@ public class ChartController {
 //    @Resource
 //    private BiMessageProducer biMessageProducer;
 //
-//    @Resource
-//    private LocalAiService localAiService;
+    @Resource
+    private LocalAiService localAiService;
 
     // region 增删改查
 
@@ -294,10 +296,10 @@ public class ChartController {
         // 压缩后的数据
         String csvData = ExcelUtils.excelToCsv(multipartFile);
         userInput.append(csvData).append("\n");
+        log.info("项目测试userinput:{} ",userInput);
+        String result = aiManager.doChartChat(userGoal, csvData);
+        log.info("项目测试result:{} ",result);
 
-//        String result = aiManager.doChat(biModelId, userInput.toString());
-//        String result = aiManager.doChartChat(userGoal, csvData);
-        String result = "";
         String[] splits = result.split("【【【【【");
         if (splits.length < 3) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI 生成错误");
@@ -563,10 +565,10 @@ public class ChartController {
         return queryWrapper;
     }
 
-//    @GetMapping("/test/ai-connection")
-//    public BaseResponse<String> testAiConnection() {
-//        boolean connected = localAiService.testConnection();
-//        return ResultUtils.success(connected ? "本地AI连接成功" : "本地AI连接失败");
-//    }
+    @GetMapping("/test/ai-connection")
+    public BaseResponse<String> testAiConnection() {
+        boolean connected = localAiService.testConnection();
+        return ResultUtils.success(connected ? "本地AI连接成功" : "本地AI连接失败");
+    }
 
 }
