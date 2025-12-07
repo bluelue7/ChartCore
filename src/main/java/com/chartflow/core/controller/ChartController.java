@@ -13,6 +13,7 @@ import com.chartflow.core.constant.UserConstant;
 import com.chartflow.core.exception.BusinessException;
 import com.chartflow.core.exception.ThrowUtils;
 import com.chartflow.core.manager.AiManager;
+import com.chartflow.core.manager.RedisLimiterManager;
 import com.chartflow.core.model.dto.chart.*;
 import com.chartflow.core.model.entity.Chart;
 import com.chartflow.core.model.entity.User;
@@ -56,8 +57,8 @@ public class ChartController {
     @Resource
     private AiManager aiManager;
 
-//    @Resource
-//    private RedisLimiterManager redisLimiterManager;
+    @Resource
+    private RedisLimiterManager redisLimiterManager;
 
     @Resource
     private ThreadPoolExecutor threadPoolExecutor;
@@ -260,7 +261,7 @@ public class ChartController {
 
         User loginUser = userService.getLoginUser(request);
         // 限流判断，每个用户一个限流器
-//        redisLimiterManager.doRateLimit("genChartByAi_" + loginUser.getId());
+        redisLimiterManager.doRateLimit("genChartByAi_" + loginUser.getId());
 
         final String prompt = "你是一个数据分析师和前端开发专家，接下来我会按照以下固定格式给你提供内容：\n" +
                 "分析需求：\n" +
