@@ -3,7 +3,6 @@ package com.chartflow.core.constant;
 /**
  * 通用常量
  *
-
  */
 public interface CommonConstant {
 
@@ -16,5 +15,4 @@ public interface CommonConstant {
      * 降序
      */
     String SORT_ORDER_DESC = " descend";
-    
 }

@@ -4,6 +4,7 @@ import cn.hutool.core.io.FileUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.chartflow.core.annotation.AuthCheck;
+import com.chartflow.core.bizmq.BiMessageProducer;
 import com.chartflow.core.common.BaseResponse;
 import com.chartflow.core.common.DeleteRequest;
 import com.chartflow.core.common.ErrorCode;
@@ -62,9 +63,9 @@ public class ChartController {
     @Resource
     private ThreadPoolExecutor threadPoolExecutor;
 
-//    @Resource
-//    private BiMessageProducer biMessageProducer;
-//
+    @Resource
+    private BiMessageProducer biMessageProducer;
+
     @Resource
     private LocalAiService localAiService;
 
@@ -272,7 +273,6 @@ public class ChartController {
                 "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
                 "【【【【【\n" +
                 "{明确的数据分析结论、越详细越好，不要生成多余的注释}";
-//        long biModelId = CommonConstant.BI_MODEL_ID;
         // 分析需求：
         // 分析网站用户的增长情况
         // 原始数据：
@@ -355,19 +355,17 @@ public class ChartController {
 
         User loginUser = userService.getLoginUser(request);
         // 限流判断，每个用户一个限流器
-//        redisLimiterManager.doRateLimit("genChartByAi_" + loginUser.getId());
-        // 无需写 prompt，直接调用现有模型，https://www.yucongming.com，公众号搜【鱼聪明AI】
-//        final String prompt = "你是一个数据分析师和前端开发专家，接下来我会按照以下固定格式给你提供内容：\n" +
-//                "分析需求：\n" +
-//                "{数据分析的需求或者目标}\n" +
-//                "原始数据：\n" +
-//                "{csv格式的原始数据，用,作为分隔符}\n" +
-//                "请根据这两部分内容，按照以下指定格式生成内容（此外不要输出任何多余的开头、结尾、注释）\n" +
-//                "【【【【【\n" +
-//                "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
-//                "【【【【【\n" +
-//                "{明确的数据分析结论、越详细越好，不要生成多余的注释}";
-        long biModelId = 1659171950288818178L;
+        redisLimiterManager.doRateLimit("genChartByAi_" + loginUser.getId());
+        final String prompt = "你是一个数据分析师和前端开发专家，接下来我会按照以下固定格式给你提供内容：\n" +
+                "分析需求：\n" +
+                "{数据分析的需求或者目标}\n" +
+                "原始数据：\n" +
+                "{csv格式的原始数据，用,作为分隔符}\n" +
+                "请根据这两部分内容，按照以下指定格式生成内容（此外不要输出任何多余的开头、结尾、注释）\n" +
+                "【【【【【\n" +
+                "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
+                "【【【【【\n" +
+                "{明确的数据分析结论、越详细越好，不要生成多余的注释}";
         // 分析需求：
         // 分析网站用户的增长情况
         // 原始数据：
@@ -378,6 +376,7 @@ public class ChartController {
 
         // 构造用户输入
         StringBuilder userInput = new StringBuilder();
+        userInput.append(prompt).append("\n");
         userInput.append("分析需求：").append("\n");
 
         // 拼接分析目标
@@ -414,8 +413,7 @@ public class ChartController {
                 return;
             }
             // 调用 AI
-//            String result = aiManager.doChat(biModelId, userInput.toString());
-            String result = "【【【【【\n" ;
+            String result = aiManager.doChat(userInput.toString());
             String[] splits = result.split("【【【【【");
             if (splits.length < 3) {
                 handleChartUpdateError(chart.getId(), "AI 生成错误");
@@ -470,19 +468,18 @@ public class ChartController {
 
         User loginUser = userService.getLoginUser(request);
         // 限流判断，每个用户一个限流器
-//        redisLimiterManager.doRateLimit("genChartByAi_" + loginUser.getId());
-        // 无需写 prompt，直接调用现有模型，https://www.yucongming.com，公众号搜【鱼聪明AI】
-//        final String prompt = "你是一个数据分析师和前端开发专家，接下来我会按照以下固定格式给你提供内容：\n" +
-//                "分析需求：\n" +
-//                "{数据分析的需求或者目标}\n" +
-//                "原始数据：\n" +
-//                "{csv格式的原始数据，用,作为分隔符}\n" +
-//                "请根据这两部分内容，按照以下指定格式生成内容（此外不要输出任何多余的开头、结尾、注释）\n" +
-//                "【【【【【\n" +
-//                "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
-//                "【【【【【\n" +
-//                "{明确的数据分析结论、越详细越好，不要生成多余的注释}";
-        long biModelId = 1659171950288818178L;
+        redisLimiterManager.doRateLimit("genChartByAi_" + loginUser.getId());
+        final String prompt = "你是一个数据分析师和前端开发专家，接下来我会按照以下固定格式给你提供内容：\n" +
+                "分析需求：\n" +
+                "{数据分析的需求或者目标}\n" +
+                "原始数据：\n" +
+                "{csv格式的原始数据，用,作为分隔符}\n" +
+                "请根据这两部分内容，按照以下指定格式生成内容（此外不要输出任何多余的开头、结尾、注释）\n" +
+                "【【【【【\n" +
+                "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
+                "【【【【【\n" +
+                "{明确的数据分析结论、越详细越好，不要生成多余的注释}";
+
         // 分析需求：
         // 分析网站用户的增长情况
         // 原始数据：
@@ -493,6 +490,7 @@ public class ChartController {
 
         // 构造用户输入
         StringBuilder userInput = new StringBuilder();
+        userInput.append(prompt).append("\n");
         userInput.append("分析需求：").append("\n");
 
         // 拼接分析目标
@@ -517,13 +515,19 @@ public class ChartController {
         boolean saveResult = chartService.save(chart);
         ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
         long newChartId = chart.getId();
-//        biMessageProducer.sendMessage(String.valueOf(newChartId));
+        biMessageProducer.sendMessage(String.valueOf(newChartId));
         BiResponse biResponse = new BiResponse();
         biResponse.setChartId(newChartId);
         return ResultUtils.success(biResponse);
     }
 
 
+    /**
+     * 处理图表更新失败
+     *
+     * @param chartId
+     * @param execMessage
+     */
     private void handleChartUpdateError(long chartId, String execMessage) {
         Chart updateChartResult = new Chart();
         updateChartResult.setId(chartId);
