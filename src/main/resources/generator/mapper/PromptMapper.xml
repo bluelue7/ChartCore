@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chartflow.core.mapper.PromptMapper">
+
+    <resultMap id="BaseResultMap" type="com.chartflow.core.model.entity.Prompt">
+            <id property="id" column="id" />
+            <result property="name" column="name" />
+            <result property="promptQuery" column="promptQuery" />
+            <result property="userId" column="userId" />
+            <result property="usageCount" column="usageCount" />
+            <result property="createTime" column="createTime" />
+            <result property="updateTime" column="updateTime" />
+            <result property="isDelete" column="isDelete" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,name,promptQuery,userId,usageCount,
+        createTime,updateTime,isDelete
+    </sql>
+</mapper>
