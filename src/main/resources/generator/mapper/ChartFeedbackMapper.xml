@@ -1,22 +1,53 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE mapper
-        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.chartflow.core.mapper.ChartFeedbackMapper">
 
     <resultMap id="BaseResultMap" type="com.chartflow.core.model.entity.ChartFeedback">
-            <id property="id" column="id" />
-            <result property="chartId" column="chartId" />
-            <result property="userId" column="userId" />
-            <result property="rating" column="rating" />
-            <result property="comment" column="comment" />
-            <result property="createTime" column="createTime" />
-            <result property="updateTime" column="updateTime" />
-            <result property="isDelete" column="isDelete" />
+            <id column="id" jdbcType="BIGINT" property="id" />
+            <result column="chartId" jdbcType="BIGINT" property="chartId" />
+            <result column="userId" jdbcType="BIGINT" property="userId" />
+            <result column="rating" jdbcType="INTEGER" property="rating" />
+            <result column="comment" jdbcType="VARCHAR" property="comment" />
+            <result column="createTime" jdbcType="TIMESTAMP" property="createTime" />
+            <result column="updateTime" jdbcType="TIMESTAMP" property="updateTime" />
+            <result column="isDelete" jdbcType="TINYINT" property="isDelete" />
     </resultMap>
 
     <sql id="Base_Column_List">
-        id,chartId,userId,rating,comment,
-        createTime,updateTime,isDelete
+        id, chartId, userId, rating, comment, createTime, updateTime, isDelete
     </sql>
+
+    <select id="selectById" parameterType="java.lang.Long" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List" />
+        from chart_feedback
+        where id = #{id} and isDelete = 0
+    </select>
+
+    <select id="selectList" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List" />
+        from chart_feedback
+        where isDelete = 0
+    </select>
+
+    <insert id="insert" parameterType="com.chartflow.core.model.entity.ChartFeedback">
+        insert into chart_feedback (chartId, userId, rating, comment, createTime, updateTime, isDelete)
+        values (#{chartId}, #{userId}, #{rating}, #{comment}, #{createTime}, #{updateTime}, #{isDelete})
+    </insert>
+
+    <update id="updateById" parameterType="com.chartflow.core.model.entity.ChartFeedback">
+        update chart_feedback
+        set chartId = #{chartId},
+            userId = #{userId},
+            rating = #{rating},
+            comment = #{comment},
+            updateTime = #{updateTime}
+        where id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="java.lang.Long">
+        update chart_feedback set isDelete = 1 where id = #{id}
+    </delete>
+
 </mapper>

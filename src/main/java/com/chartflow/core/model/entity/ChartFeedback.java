@@ -1,32 +1,35 @@
 package com.chartflow.core.model.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import java.io.Serializable;
 import java.util.Date;
 import lombok.Data;
 
 /**
  * 图表反馈表
- * @TableName chart_feedback
+ *
  */
-@TableName(value ="chart_feedback")
+@TableName(value = "chart_feedback")
 @Data
-public class ChartFeedback {
+public class ChartFeedback implements Serializable {
+
     /**
-     * id
+     * 主键ID
      */
     @TableId(type = IdType.AUTO)
     private Long id;
 
     /**
-     * 表结果ID
+     * 图表ID
      */
     private Long chartId;
 
     /**
-     * 反馈用户ID
+     * 用户ID
      */
     private Long userId;
 
@@ -55,4 +58,7 @@ public class ChartFeedback {
      */
     @TableLogic
     private Integer isDelete;
+
+    @TableField(exist = false)
+    private static final long serialVersionUID = 1L;
 }
