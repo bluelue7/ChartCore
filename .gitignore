@@ -16,6 +16,10 @@ target/
 .springBeans
 .sts4-cache
 
+### 本地配置 ###
+config/local.yml
+src/main/resources/application-local.yml
+
 ### IntelliJ IDEA ###
 .idea
 *.iws

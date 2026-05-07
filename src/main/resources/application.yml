@@ -6,7 +6,7 @@ spring:
     name: chart-core
   # 默认 dev 环境
   profiles:
-    active: dev
+    active: dev,local
   # 支持 swagger3
   mvc:
     pathmatch:
@@ -72,6 +72,12 @@ cos:
     secretKey: xxx
     region: xxx
     bucket: xxx
+# 阿里云OSS配置
+oss:
+  accessKey: ${OSS_ACCESS_KEY:your-access-key}
+  secretKey: ${OSS_SECRET_KEY:your-secret-key}
+  endpoint: ${OSS_ENDPOINT:oss-cn-hangzhou.aliyuncs.com}
+  bucket: ${OSS_BUCKET:web-talis-bucket}
 # 接口文档配置
 knife4j:
   enable: true
