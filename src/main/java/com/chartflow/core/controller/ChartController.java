@@ -9,7 +9,6 @@ import com.chartflow.core.common.BaseResponse;
 import com.chartflow.core.common.DeleteRequest;
 import com.chartflow.core.common.ErrorCode;
 import com.chartflow.core.common.ResultUtils;
-import com.chartflow.core.constant.CommonConstant;
 import com.chartflow.core.constant.UserConstant;
 import com.chartflow.core.exception.BusinessException;
 import com.chartflow.core.exception.ThrowUtils;
@@ -17,15 +16,15 @@ import com.chartflow.core.manager.AiManager;
 import com.chartflow.core.manager.RedisLimiterManager;
 import com.chartflow.core.model.dto.chart.*;
 import com.chartflow.core.model.entity.Chart;
+import com.chartflow.core.model.entity.Prompt;
 import com.chartflow.core.model.entity.User;
 import com.chartflow.core.model.vo.BiResponse;
 import com.chartflow.core.service.ChartService;
 import com.chartflow.core.service.LocalAiService;
+import com.chartflow.core.service.PromptService;
 import com.chartflow.core.service.UserService;
 import com.chartflow.core.utils.ExcelUtils;
-import com.chartflow.core.utils.SqlUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
@@ -39,9 +38,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 
 /**
- * 帖子接口
+ * 图表接口
  *
-
  */
 @RestController
 @RequestMapping("/chart")
@@ -68,6 +66,9 @@ public class ChartController {
 
     @Resource
     private LocalAiService localAiService;
+
+    @Resource
+    private PromptService promptService;
 
     // region 增删改查
 
@@ -107,10 +108,8 @@ public class ChartController {
         }
         User user = userService.getLoginUser(request);
         long id = deleteRequest.getId();
-        // 判断是否存在
         Chart oldChart = chartService.getById(id);
         ThrowUtils.throwIf(oldChart == null, ErrorCode.NOT_FOUND_ERROR);
-        // 仅本人或管理员可删除
         if (!oldChart.getUserId().equals(user.getId()) && !userService.isAdmin(request)) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
@@ -119,31 +118,31 @@ public class ChartController {
     }
 
     /**
-     * 更新（仅管理员）
+     * 更新
      *
      * @param chartUpdateRequest
+     * @param request
      * @return
      */
     @PostMapping("/update")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Boolean> updateChart(@RequestBody ChartUpdateRequest chartUpdateRequest) {
+    public BaseResponse<Boolean> updateChart(@RequestBody ChartUpdateRequest chartUpdateRequest,
+            HttpServletRequest request) {
         if (chartUpdateRequest == null || chartUpdateRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         Chart chart = new Chart();
         BeanUtils.copyProperties(chartUpdateRequest, chart);
-        long id = chartUpdateRequest.getId();
-        // 判断是否存在
-        Chart oldChart = chartService.getById(id);
-        ThrowUtils.throwIf(oldChart == null, ErrorCode.NOT_FOUND_ERROR);
         boolean result = chartService.updateById(chart);
-        return ResultUtils.success(result);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        return ResultUtils.success(true);
     }
 
     /**
      * 根据 id 获取
      *
      * @param id
+     * @param request
      * @return
      */
     @GetMapping("/get")
@@ -159,7 +158,7 @@ public class ChartController {
     }
 
     /**
-     * 分页获取列表（封装类）
+     * 分页获取列表
      *
      * @param chartQueryRequest
      * @param request
@@ -170,65 +169,12 @@ public class ChartController {
             HttpServletRequest request) {
         long current = chartQueryRequest.getCurrent();
         long size = chartQueryRequest.getPageSize();
-        // 限制爬虫
-        ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
-        Page<Chart> chartPage = chartService.page(new Page<>(current, size),
-                getQueryWrapper(chartQueryRequest));
-        return ResultUtils.success(chartPage);
-    }
-
-    /**
-     * 分页获取当前用户创建的资源列表
-     *
-     * @param chartQueryRequest
-     * @param request
-     * @return
-     */
-    @PostMapping("/my/list/page")
-    public BaseResponse<Page<Chart>> listMyChartByPage(@RequestBody ChartQueryRequest chartQueryRequest,
-            HttpServletRequest request) {
-        if (chartQueryRequest == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        User loginUser = userService.getLoginUser(request);
-        chartQueryRequest.setUserId(loginUser.getId());
-        long current = chartQueryRequest.getCurrent();
-        long size = chartQueryRequest.getPageSize();
-        // 限制爬虫
-        ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
-        Page<Chart> chartPage = chartService.page(new Page<>(current, size),
-                getQueryWrapper(chartQueryRequest));
+        QueryWrapper<Chart> queryWrapper = chartService.getQueryWrapper(chartQueryRequest);
+        Page<Chart> chartPage = chartService.page(new Page<>(current, size), queryWrapper);
         return ResultUtils.success(chartPage);
     }
 
     // endregion
-
-    /**
-     * 编辑（用户）
-     *
-     * @param chartEditRequest
-     * @param request
-     * @return
-     */
-    @PostMapping("/edit")
-    public BaseResponse<Boolean> editChart(@RequestBody ChartEditRequest chartEditRequest, HttpServletRequest request) {
-        if (chartEditRequest == null || chartEditRequest.getId() <= 0) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        Chart chart = new Chart();
-        BeanUtils.copyProperties(chartEditRequest, chart);
-        User loginUser = userService.getLoginUser(request);
-        long id = chartEditRequest.getId();
-        // 判断是否存在
-        Chart oldChart = chartService.getById(id);
-        ThrowUtils.throwIf(oldChart == null, ErrorCode.NOT_FOUND_ERROR);
-        // 仅本人或管理员可编辑
-        if (!oldChart.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
-            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
-        }
-        boolean result = chartService.updateById(chart);
-        return ResultUtils.success(result);
-    }
 
     /**
      * 智能分析（同步）
@@ -244,6 +190,7 @@ public class ChartController {
         String name = genChartByAiRequest.getName();
         String goal = genChartByAiRequest.getGoal();
         String chartType = genChartByAiRequest.getChartType();
+        Long promptId = genChartByAiRequest.getPromptId();
         log.info("项目测试",name);
         // 校验
         ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "目标为空");
@@ -263,16 +210,30 @@ public class ChartController {
         // 限流判断，每个用户一个限流器
         redisLimiterManager.doRateLimit("genChartByAi_" + loginUser.getId());
 
-        final String prompt = "你是一个数据分析师和前端开发专家，接下来我会按照以下固定格式给你提供内容：\n" +
-                "分析需求：\n" +
-                "{数据分析的需求或者目标}\n" +
-                "原始数据：\n" +
-                "{csv格式的原始数据，用,作为分隔符}\n" +
-                "请根据这两部分内容，按照以下指定格式生成内容（此外不要输出任何多余的开头、结尾、注释）\n" +
-                "【【【【【\n" +
-                "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
-                "【【【【【\n" +
-                "{明确的数据分析结论、越详细越好，不要生成多余的注释}";
+        // 获取Prompt
+        String promptQuery = null;
+        if (promptId != null && promptId > 0) {
+            Prompt prompt = promptService.getById(promptId);
+            if (prompt != null) {
+                promptQuery = prompt.getPromptQuery();
+                // 增加使用次数
+                promptService.incrementUsageCount(promptId);
+            }
+        }
+
+        // 如果没有选择prompt，使用默认prompt
+        if (StringUtils.isBlank(promptQuery)) {
+            promptQuery = "你是一个数据分析师和前端开发专家，接下来我会按照以下固定格式给你提供内容：\n" +
+                    "分析需求：\n" +
+                    "{数据分析的需求或者目标}\n" +
+                    "原始数据：\n" +
+                    "{csv格式的原始数据，用,作为分隔符}\n" +
+                    "请根据这两部分内容，按照以下指定格式生成内容（此外不要输出任何多余的开头、结尾、注释）\n" +
+                    "【【【【【\n" +
+                    "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
+                    "【【【【【\n" +
+                    "{明确的数据分析结论、越详细越好，不要生成多余的注释}";
+        }
         // 分析需求：
         // 分析网站用户的增长情况
         // 原始数据：
@@ -283,7 +244,7 @@ public class ChartController {
 
         // 构造用户输入
         StringBuilder userInput = new StringBuilder();
-        userInput.append(prompt).append("\n");
+        userInput.append(promptQuery).append("\n");
         userInput.append("分析需求：").append("\n");
 
         // 拼接分析目标
@@ -339,6 +300,7 @@ public class ChartController {
         String name = genChartByAiRequest.getName();
         String goal = genChartByAiRequest.getGoal();
         String chartType = genChartByAiRequest.getChartType();
+        Long promptId = genChartByAiRequest.getPromptId();
         // 校验
         ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "目标为空");
         ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 100, ErrorCode.PARAMS_ERROR, "名称过长");
@@ -352,31 +314,52 @@ public class ChartController {
         String suffix = FileUtil.getSuffix(originalFilename);
         final List<String> validFileSuffixList = Arrays.asList("xlsx", "xls");
         ThrowUtils.throwIf(!validFileSuffixList.contains(suffix), ErrorCode.PARAMS_ERROR, "文件后缀非法");
-
         User loginUser = userService.getLoginUser(request);
         // 限流判断，每个用户一个限流器
         redisLimiterManager.doRateLimit("genChartByAi_" + loginUser.getId());
-        final String prompt = "你是一个数据分析师和前端开发专家，接下来我会按照以下固定格式给你提供内容：\n" +
-                "分析需求：\n" +
-                "{数据分析的需求或者目标}\n" +
-                "原始数据：\n" +
-                "{csv格式的原始数据，用,作为分隔符}\n" +
-                "请根据这两部分内容，按照以下指定格式生成内容（此外不要输出任何多余的开头、结尾、注释）\n" +
-                "【【【【【\n" +
-                "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
-                "【【【【【\n" +
-                "{明确的数据分析结论、越详细越好，不要生成多余的注释}";
-        // 分析需求：
-        // 分析网站用户的增长情况
-        // 原始数据：
-        // 日期,用户数
-        // 1号,10
-        // 2号,20
-        // 3号,30
+
+        // 获取Prompt
+        String promptQuery = null;
+        if (promptId != null && promptId > 0) {
+            Prompt prompt = promptService.getById(promptId);
+            if (prompt != null) {
+                promptQuery = prompt.getPromptQuery();
+                // 增加使用次数
+                promptService.incrementUsageCount(promptId);
+            }
+        }
+
+        // 如果没有选择prompt，使用默认prompt
+        if (StringUtils.isBlank(promptQuery)) {
+            promptQuery = "你是一个数据分析师和前端开发专家，接下来我会按照以下固定格式给你提供内容：\n" +
+                    "分析需求：\n" +
+                    "{数据分析的需求或者目标}\n" +
+                    "原始数据：\n" +
+                    "{csv格式的原始数据，用,作为分隔符}\n" +
+                    "请根据这两部分内容，按照以下指定格式生成内容（此外不要输出任何多余的开头、结尾、注释）\n" +
+                    "【【【【【\n" +
+                    "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
+                    "【【【【【\n" +
+                    "{明确的数据分析结论、越详细越好，不要生成多余的注释}";
+        }
+
+        // 压缩后的数据
+        String csvData = ExcelUtils.excelToCsv(multipartFile);
+
+        // 插入到数据库
+        Chart chart = new Chart();
+        chart.setName(name);
+        chart.setGoal(goal);
+        chart.setChartData(csvData);
+        chart.setChartType(chartType);
+        chart.setUserId(loginUser.getId());
+        chart.setStatus("running");
+        boolean saveResult = chartService.save(chart);
+        ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
 
         // 构造用户输入
         StringBuilder userInput = new StringBuilder();
-        userInput.append(prompt).append("\n");
+        userInput.append(promptQuery).append("\n");
         userInput.append("分析需求：").append("\n");
 
         // 拼接分析目标
@@ -386,55 +369,38 @@ public class ChartController {
         }
         userInput.append(userGoal).append("\n");
         userInput.append("原始数据：").append("\n");
-        // 压缩后的数据
-        String csvData = ExcelUtils.excelToCsv(multipartFile);
         userInput.append(csvData).append("\n");
-
-        // 插入到数据库
-        Chart chart = new Chart();
-        chart.setName(name);
-        chart.setGoal(goal);
-        chart.setChartData(csvData);
-        chart.setChartType(chartType);
-        chart.setStatus("wait");
-        chart.setUserId(loginUser.getId());
-        boolean saveResult = chartService.save(chart);
-        ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
-
-        // todo 建议处理任务队列满了后，抛异常的情况
-        CompletableFuture.runAsync(() -> {
-            // 先修改图表任务状态为 “执行中”。等执行成功后，修改为 “已完成”、保存执行结果；执行失败后，状态修改为 “失败”，记录任务失败信息。
-            Chart updateChart = new Chart();
-            updateChart.setId(chart.getId());
-            updateChart.setStatus("running");
-            boolean b = chartService.updateById(updateChart);
-            if (!b) {
-                handleChartUpdateError(chart.getId(), "更新图表执行中状态失败");
-                return;
-            }
-            // 调用 AI
-            String result = aiManager.doChat(userInput.toString());
-            String[] splits = result.split("【【【【【");
-            if (splits.length < 3) {
-                handleChartUpdateError(chart.getId(), "AI 生成错误");
-                return;
-            }
-            String genChart = splits[1].trim();
-            String genResult = splits[2].trim();
-            Chart updateChartResult = new Chart();
-            updateChartResult.setId(chart.getId());
-            updateChartResult.setGenChart(genChart);
-            updateChartResult.setGenResult(genResult);
-            // todo 建议定义状态为枚举值
-            updateChartResult.setStatus("succeed");
-            boolean updateResult = chartService.updateById(updateChartResult);
-            if (!updateResult) {
-                handleChartUpdateError(chart.getId(), "更新图表成功状态失败");
-            }
-        }, threadPoolExecutor);
 
         BiResponse biResponse = new BiResponse();
         biResponse.setChartId(chart.getId());
+        // 执行异步任务
+        String finalUserGoal = userGoal;
+        CompletableFuture.runAsync(() -> {
+            Chart updateChartResult = new Chart();
+            updateChartResult.setId(chart.getId());
+            try {
+                String result = aiManager.doChartChat(finalUserGoal, csvData);
+                String[] splits = result.split("【【【【【");
+                if (splits.length < 3) {
+                    chart.setStatus("failed");
+                    chartService.updateById(chart);
+                    log.error("AI 生成错误");
+                    return;
+                }
+                String genChart = splits[1].trim();
+                String genResult = splits[2].trim();
+                updateChartResult.setGenChart(genChart);
+                updateChartResult.setGenResult(genResult);
+                updateChartResult.setStatus("succeed");
+            } catch (Exception e) {
+                chart.setStatus("failed");
+                log.error("gen_chart_error", e);
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI 生成错误");
+            } finally {
+                chartService.updateById(updateChartResult);
+            }
+        }, threadPoolExecutor);
+
         return ResultUtils.success(biResponse);
     }
 
@@ -452,6 +418,7 @@ public class ChartController {
         String name = genChartByAiRequest.getName();
         String goal = genChartByAiRequest.getGoal();
         String chartType = genChartByAiRequest.getChartType();
+        Long promptId = genChartByAiRequest.getPromptId();
         // 校验
         ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "目标为空");
         ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 100, ErrorCode.PARAMS_ERROR, "名称过长");
@@ -469,40 +436,34 @@ public class ChartController {
         User loginUser = userService.getLoginUser(request);
         // 限流判断，每个用户一个限流器
         redisLimiterManager.doRateLimit("genChartByAi_" + loginUser.getId());
-        final String prompt = "你是一个数据分析师和前端开发专家，接下来我会按照以下固定格式给你提供内容：\n" +
-                "分析需求：\n" +
-                "{数据分析的需求或者目标}\n" +
-                "原始数据：\n" +
-                "{csv格式的原始数据，用,作为分隔符}\n" +
-                "请根据这两部分内容，按照以下指定格式生成内容（此外不要输出任何多余的开头、结尾、注释）\n" +
-                "【【【【【\n" +
-                "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
-                "【【【【【\n" +
-                "{明确的数据分析结论、越详细越好，不要生成多余的注释}";
 
-        // 分析需求：
-        // 分析网站用户的增长情况
-        // 原始数据：
-        // 日期,用户数
-        // 1号,10
-        // 2号,20
-        // 3号,30
-
-        // 构造用户输入
-        StringBuilder userInput = new StringBuilder();
-        userInput.append(prompt).append("\n");
-        userInput.append("分析需求：").append("\n");
-
-        // 拼接分析目标
-        String userGoal = goal;
-        if (StringUtils.isNotBlank(chartType)) {
-            userGoal += "，请使用" + chartType;
+        // 获取Prompt
+        String promptQuery = null;
+        if (promptId != null && promptId > 0) {
+            Prompt prompt = promptService.getById(promptId);
+            if (prompt != null) {
+                promptQuery = prompt.getPromptQuery();
+                // 增加使用次数
+                promptService.incrementUsageCount(promptId);
+            }
         }
-        userInput.append(userGoal).append("\n");
-        userInput.append("原始数据：").append("\n");
+
+        // 如果没有选择prompt，使用默认prompt
+        if (StringUtils.isBlank(promptQuery)) {
+            promptQuery = "你是一个数据分析师和前端开发专家，接下来我会按照以下固定格式给你提供内容：\n" +
+                    "分析需求：\n" +
+                    "{数据分析的需求或者目标}\n" +
+                    "原始数据：\n" +
+                    "{csv格式的原始数据，用,作为分隔符}\n" +
+                    "请根据这两部分内容，按照以下指定格式生成内容（此外不要输出任何多余的开头、结尾、注释）\n" +
+                    "【【【【【\n" +
+                    "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
+                    "【【【【【\n" +
+                    "{明确的数据分析结论、越详细越好，不要生成多余的注释}";
+        }
+
         // 压缩后的数据
         String csvData = ExcelUtils.excelToCsv(multipartFile);
-        userInput.append(csvData).append("\n");
 
         // 插入到数据库
         Chart chart = new Chart();
@@ -510,70 +471,17 @@ public class ChartController {
         chart.setGoal(goal);
         chart.setChartData(csvData);
         chart.setChartType(chartType);
-        chart.setStatus("wait");
         chart.setUserId(loginUser.getId());
+        chart.setStatus("running");
         boolean saveResult = chartService.save(chart);
         ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
+
+        BiResponse biResponse = new BiResponse();
+        biResponse.setChartId(chart.getId());
+
         long newChartId = chart.getId();
         biMessageProducer.sendMessage(String.valueOf(newChartId));
-        BiResponse biResponse = new BiResponse();
-        biResponse.setChartId(newChartId);
+
         return ResultUtils.success(biResponse);
     }
-
-
-    /**
-     * 处理图表更新失败
-     *
-     * @param chartId
-     * @param execMessage
-     */
-    private void handleChartUpdateError(long chartId, String execMessage) {
-        Chart updateChartResult = new Chart();
-        updateChartResult.setId(chartId);
-        updateChartResult.setStatus("failed");
-        updateChartResult.setExecMessage("execMessage");
-        boolean updateResult = chartService.updateById(updateChartResult);
-        if (!updateResult) {
-            log.error("更新图表失败状态失败" + chartId + "," + execMessage);
-        }
-    }
-
-
-    /**
-     * 获取查询包装类
-     *
-     * @param chartQueryRequest
-     * @return
-     */
-    private QueryWrapper<Chart> getQueryWrapper(ChartQueryRequest chartQueryRequest) {
-        QueryWrapper<Chart> queryWrapper = new QueryWrapper<>();
-        if (chartQueryRequest == null) {
-            return queryWrapper;
-        }
-        Long id = chartQueryRequest.getId();
-        String name = chartQueryRequest.getName();
-        String goal = chartQueryRequest.getGoal();
-        String chartType = chartQueryRequest.getChartType();
-        Long userId = chartQueryRequest.getUserId();
-        String sortField = chartQueryRequest.getSortField();
-        String sortOrder = chartQueryRequest.getSortOrder();
-
-        queryWrapper.eq(id != null && id > 0, "id", id);
-        queryWrapper.like(StringUtils.isNotBlank(name), "name", name);
-        queryWrapper.eq(StringUtils.isNotBlank(goal), "goal", goal);
-        queryWrapper.eq(StringUtils.isNotBlank(chartType), "chartType", chartType);
-        queryWrapper.eq(ObjectUtils.isNotEmpty(userId), "userId", userId);
-        queryWrapper.eq("isDelete", false);
-        queryWrapper.orderBy(SqlUtils.validSortField(sortField), sortOrder.equals(CommonConstant.SORT_ORDER_ASC),
-                sortField);
-        return queryWrapper;
-    }
-
-    @GetMapping("/test/ai-connection")
-    public BaseResponse<String> testAiConnection() {
-        boolean connected = localAiService.testConnection();
-        return ResultUtils.success(connected ? "本地AI连接成功" : "本地AI连接失败");
-    }
-
 }

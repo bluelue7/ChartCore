@@ -2,6 +2,8 @@ package com.chartflow.core.service;
 
 import com.chartflow.core.model.entity.Chart;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.chartflow.core.model.dto.chart.ChartQueryRequest;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 
 /**
 * @author bluelue7
@@ -10,4 +12,11 @@ import com.baomidou.mybatisplus.extension.service.IService;
 */
 public interface ChartService extends IService<Chart> {
 
+    /**
+     * 获取查询条件封装
+     *
+     * @param chartQueryRequest 查询请求
+     * @return QueryWrapper
+     */
+    QueryWrapper<Chart> getQueryWrapper(ChartQueryRequest chartQueryRequest);
 }
