@@ -1,5 +1,6 @@
 package com.chartflow.core.manager;
 
+import com.chartflow.core.model.vo.AiResponse;
 import com.chartflow.core.service.LocalAiService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,5 +30,19 @@ public class AiManager {
      */
     public String doChartChat(String goal, String csvData) {
         return localAiService.doChartChat(goal, csvData);
+    }
+
+    /**
+     * 调用本地AI（返回详细信息）
+     */
+    public AiResponse doChatWithInfo(String message) {
+        return localAiService.doChatWithInfo(message);
+    }
+
+    /**
+     * 专门用于图表生成的方法（返回详细信息）
+     */
+    public AiResponse doChartChatWithInfo(String goal, String csvData) {
+        return localAiService.doChartChatWithInfo(goal, csvData);
     }
 }

@@ -3,6 +3,7 @@ package com.chartflow.core.service.impl;
 import com.chartflow.core.common.ErrorCode;
 import com.chartflow.core.exception.BusinessException;
 import com.chartflow.core.model.dto.chart.OllamaChatRequest;
+import com.chartflow.core.model.vo.AiResponse;
 import com.chartflow.core.model.vo.OllamaChatResponse;
 import com.chartflow.core.service.LocalAiService;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,28 @@ public class LocalAiServiceImpl implements LocalAiService {
 
     @Override
     public String doChat(String message) {
+        return doChatWithInfo(message).getContent();
+    }
+
+    @Override
+    public String doChartChat(String goal, String csvData) {
+        return doChartChatWithInfo(goal, csvData).getContent();
+    }
+
+    @Override
+    public boolean testConnection() {
+        try {
+            String url = baseUrl + "/models";
+            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+            return response.getStatusCode() == HttpStatus.OK;
+        } catch (Exception e) {
+            log.error("测试本地AI连接失败", e);
+            return false;
+        }
+    }
+
+    @Override
+    public AiResponse doChatWithInfo(String message) {
         try {
             String url = baseUrl + "/chat/completions";
 
@@ -59,7 +82,14 @@ public class LocalAiServiceImpl implements LocalAiService {
 
                 String content = response.getBody().getChoices().get(0).getMessage().getContent();
                 log.info("本地AI返回成功，内容长度: {}", content.length());
-                return content;
+
+                // 提取Token信息
+                OllamaChatResponse.Usage usage = response.getBody().getUsage();
+                Integer inputTokens = usage != null ? usage.getPrompt_tokens() : null;
+                Integer outputTokens = usage != null ? usage.getCompletion_tokens() : null;
+                Integer totalTokens = usage != null ? usage.getTotal_tokens() : null;
+
+                return AiResponse.success(content, inputTokens, outputTokens, totalTokens);
             }
 
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI返回内容为空");
@@ -71,10 +101,10 @@ public class LocalAiServiceImpl implements LocalAiService {
     }
 
     @Override
-    public String doChartChat(String goal, String csvData) {
+    public AiResponse doChartChatWithInfo(String goal, String csvData) {
         // 构建专门的图表生成提示词
         String prompt = buildChartPrompt(goal, csvData);
-        return doChat(prompt);
+        return doChatWithInfo(prompt);
     }
 
     /**
@@ -89,17 +119,5 @@ public class LocalAiServiceImpl implements LocalAiService {
                 "{这里输出ECharts V5的option配置对象JSON代码，合理地进行数据可视化}\n" +
                 "【【【【【\n" +
                 "{这里输出详细的数据分析结论}";
-    }
-
-   @Override
-    public boolean testConnection() {
-        try {
-            String url = baseUrl + "/models";
-            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
-            return response.getStatusCode() == HttpStatus.OK;
-        } catch (Exception e) {
-            log.error("测试本地AI连接失败", e);
-            return false;
-        }
     }
 }

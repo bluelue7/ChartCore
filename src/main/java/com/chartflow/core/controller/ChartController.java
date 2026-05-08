@@ -15,14 +15,13 @@ import com.chartflow.core.exception.ThrowUtils;
 import com.chartflow.core.manager.AiManager;
 import com.chartflow.core.manager.RedisLimiterManager;
 import com.chartflow.core.model.dto.chart.*;
+import com.chartflow.core.model.dto.modelrecord.ModelRecordAddRequest;
+import com.chartflow.core.model.dto.tasklog.TaskLogAddRequest;
 import com.chartflow.core.model.entity.Chart;
 import com.chartflow.core.model.entity.Prompt;
 import com.chartflow.core.model.entity.User;
 import com.chartflow.core.model.vo.BiResponse;
-import com.chartflow.core.service.ChartService;
-import com.chartflow.core.service.LocalAiService;
-import com.chartflow.core.service.PromptService;
-import com.chartflow.core.service.UserService;
+import com.chartflow.core.service.*;
 import com.chartflow.core.utils.ExcelUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -69,6 +68,12 @@ public class ChartController {
 
     @Resource
     private PromptService promptService;
+
+    @Resource
+    private ModelRecordService modelRecordService;
+
+    @Resource
+    private TaskLogService taskLogService;
 
     // region 增删改查
 
@@ -234,32 +239,46 @@ public class ChartController {
                     "【【【【【\n" +
                     "{明确的数据分析结论、越详细越好，不要生成多余的注释}";
         }
-        // 分析需求：
-        // 分析网站用户的增长情况
-        // 原始数据：
-        // 日期,用户数
-        // 1号,10
-        // 2号,20
-        // 3号,30
 
-        // 构造用户输入
-        StringBuilder userInput = new StringBuilder();
-        userInput.append(promptQuery).append("\n");
-        userInput.append("分析需求：").append("\n");
+        // 压缩后的数据
+        String csvData = ExcelUtils.excelToCsv(multipartFile);
 
         // 拼接分析目标
         String userGoal = goal;
         if (StringUtils.isNotBlank(chartType)) {
             userGoal += "，请使用" + chartType;
         }
-        userInput.append(userGoal).append("\n");
-        userInput.append("原始数据：").append("\n");
-        // 压缩后的数据
-        String csvData = ExcelUtils.excelToCsv(multipartFile);
-        userInput.append(csvData).append("\n");
-        log.info("项目测试userinput:{} ",userInput);
-        String result = aiManager.doChartChat(userGoal, csvData);
-        log.info("项目测试result:{} ",result);
+
+        // 调用AI前记录
+        long startTime = System.currentTimeMillis();
+        Long modelRecordId = null;
+        String result = null;
+        try {
+            // 插入模型调用记录（running状态）
+            com.chartflow.core.model.dto.modelrecord.ModelRecordAddRequest modelRecordAddRequest = 
+                new com.chartflow.core.model.dto.modelrecord.ModelRecordAddRequest();
+            modelRecordAddRequest.setUserId(loginUser.getId());
+            modelRecordAddRequest.setModelName("qwen2.5:7b"); // 可以从配置读取
+            modelRecordAddRequest.setInvocationType("chartGen");
+            modelRecordAddRequest.setRequestContent(userGoal + "\n" + csvData);
+            modelRecordAddRequest.setStatus("running");
+            modelRecordId = modelRecordService.addModelRecord(modelRecordAddRequest);
+
+            result = aiManager.doChartChat(userGoal, csvData);
+            log.info("项目测试result:{} ",result);
+
+            // 更新模型调用记录（success状态）
+            int costMs = (int)(System.currentTimeMillis() - startTime);
+            modelRecordService.updateModelRecordStatus(modelRecordId, "success", result, null, costMs);
+
+        } catch (Exception e) {
+            // 更新模型调用记录（failed状态）
+            if (modelRecordId != null) {
+                int costMs = (int)(System.currentTimeMillis() - startTime);
+                modelRecordService.updateModelRecordStatus(modelRecordId, "failed", null, e.getMessage(), costMs);
+            }
+            throw e;
+        }
 
         String[] splits = result.split("【【【【【");
         if (splits.length < 3) {
@@ -279,6 +298,15 @@ public class ChartController {
         chart.setStatus("succeed");
         boolean saveResult = chartService.save(chart);
         ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
+
+        // 更新模型调用记录，关联chartId
+        if (modelRecordId != null) {
+            com.chartflow.core.model.entity.ModelRecord modelRecord = new com.chartflow.core.model.entity.ModelRecord();
+            modelRecord.setId(modelRecordId);
+            modelRecord.setChartId(chart.getId());
+            modelRecordService.updateById(modelRecord);
+        }
+
         BiResponse biResponse = new BiResponse();
         biResponse.setGenChart(genChart);
         biResponse.setGenResult(genResult);
@@ -357,33 +385,53 @@ public class ChartController {
         boolean saveResult = chartService.save(chart);
         ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
 
-        // 构造用户输入
-        StringBuilder userInput = new StringBuilder();
-        userInput.append(promptQuery).append("\n");
-        userInput.append("分析需求：").append("\n");
+        // 插入任务日志（running状态）
+        TaskLogAddRequest taskLogAddRequest = new TaskLogAddRequest();
+        taskLogAddRequest.setChartId(String.valueOf(chart.getId()));
+        taskLogAddRequest.setStatus("running");
+        Long taskLogId = taskLogService.addTaskLog(taskLogAddRequest);
+
+        // 插入模型调用记录（running状态）
+        ModelRecordAddRequest modelRecordAddRequest = new ModelRecordAddRequest();
+        modelRecordAddRequest.setChartId(chart.getId());
+        modelRecordAddRequest.setUserId(loginUser.getId());
+        modelRecordAddRequest.setModelName("qwen2.5:7b");
+        modelRecordAddRequest.setInvocationType("chartGen");
+        modelRecordAddRequest.setRequestContent(goal + "\n" + csvData);
+        modelRecordAddRequest.setStatus("running");
+        Long modelRecordId = modelRecordService.addModelRecord(modelRecordAddRequest);
 
         // 拼接分析目标
         String userGoal = goal;
         if (StringUtils.isNotBlank(chartType)) {
             userGoal += "，请使用" + chartType;
         }
-        userInput.append(userGoal).append("\n");
-        userInput.append("原始数据：").append("\n");
-        userInput.append(csvData).append("\n");
 
         BiResponse biResponse = new BiResponse();
         biResponse.setChartId(chart.getId());
+
+        final Long finalTaskLogId = taskLogId;
+        final Long finalModelRecordId = modelRecordId;
+        final Long chartId = chart.getId();
+
         // 执行异步任务
         String finalUserGoal = userGoal;
         CompletableFuture.runAsync(() -> {
+            long startTime = System.currentTimeMillis();
             Chart updateChartResult = new Chart();
-            updateChartResult.setId(chart.getId());
+            updateChartResult.setId(chartId);
             try {
                 String result = aiManager.doChartChat(finalUserGoal, csvData);
                 String[] splits = result.split("【【【【【");
                 if (splits.length < 3) {
                     chart.setStatus("failed");
                     chartService.updateById(chart);
+                    // 更新任务日志（failed状态）
+                    taskLogService.updateTaskLogStatus(finalTaskLogId, "failed", 
+                        (int)(System.currentTimeMillis() - startTime), "AI生成格式错误");
+                    // 更新模型调用记录（failed状态）
+                    modelRecordService.updateModelRecordStatus(finalModelRecordId, "failed", null, 
+                        "AI生成格式错误", (int)(System.currentTimeMillis() - startTime));
                     log.error("AI 生成错误");
                     return;
                 }
@@ -392,8 +440,21 @@ public class ChartController {
                 updateChartResult.setGenChart(genChart);
                 updateChartResult.setGenResult(genResult);
                 updateChartResult.setStatus("succeed");
+
+                int costMs = (int)(System.currentTimeMillis() - startTime);
+                // 更新任务日志（success状态）
+                taskLogService.updateTaskLogStatus(finalTaskLogId, "success", costMs, "执行成功");
+                // 更新模型调用记录（success状态）
+                modelRecordService.updateModelRecordStatus(finalModelRecordId, "success", result, null, costMs);
+
             } catch (Exception e) {
                 chart.setStatus("failed");
+                int costMs = (int)(System.currentTimeMillis() - startTime);
+                // 更新任务日志（failed状态）
+                taskLogService.updateTaskLogStatus(finalTaskLogId, "failed", costMs, e.getMessage());
+                // 更新模型调用记录（failed状态）
+                modelRecordService.updateModelRecordStatus(finalModelRecordId, "failed", null, 
+                    e.getMessage(), costMs);
                 log.error("gen_chart_error", e);
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI 生成错误");
             } finally {
@@ -475,6 +536,24 @@ public class ChartController {
         chart.setStatus("running");
         boolean saveResult = chartService.save(chart);
         ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
+
+        // 插入任务日志（running状态）
+        com.chartflow.core.model.dto.tasklog.TaskLogAddRequest taskLogAddRequest = 
+            new com.chartflow.core.model.dto.tasklog.TaskLogAddRequest();
+        taskLogAddRequest.setChartId(String.valueOf(chart.getId()));
+        taskLogAddRequest.setStatus("running");
+        Long taskLogId = taskLogService.addTaskLog(taskLogAddRequest);
+
+        // 插入模型调用记录（running状态）
+        com.chartflow.core.model.dto.modelrecord.ModelRecordAddRequest modelRecordAddRequest = 
+            new com.chartflow.core.model.dto.modelrecord.ModelRecordAddRequest();
+        modelRecordAddRequest.setChartId(chart.getId());
+        modelRecordAddRequest.setUserId(loginUser.getId());
+        modelRecordAddRequest.setModelName("qwen2.5:7b");
+        modelRecordAddRequest.setInvocationType("chartGen");
+        modelRecordAddRequest.setRequestContent(goal + "\n" + csvData);
+        modelRecordAddRequest.setStatus("running");
+        Long modelRecordId = modelRecordService.addModelRecord(modelRecordAddRequest);
 
         BiResponse biResponse = new BiResponse();
         biResponse.setChartId(chart.getId());
