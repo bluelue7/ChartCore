@@ -28,4 +28,14 @@ public interface LocalAiService {
      * 专门为图表生成优化的方法（返回详细信息）
      */
     AiResponse doChartChatWithInfo(String goal, String csvData);
+
+    /**
+     * 专门为图表生成优化的方法（支持自定义prompt）
+     */
+    String doChartChat(String goal, String csvData, String customPrompt);
+
+    /**
+     * 专门为图表生成优化的方法（支持自定义prompt，返回详细信息）
+     */
+    AiResponse doChartChatWithInfo(String goal, String csvData, String customPrompt);
 }

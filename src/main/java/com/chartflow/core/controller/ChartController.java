@@ -264,7 +264,7 @@ public class ChartController {
             modelRecordAddRequest.setStatus("running");
             modelRecordId = modelRecordService.addModelRecord(modelRecordAddRequest);
 
-            result = aiManager.doChartChat(userGoal, csvData);
+            result = aiManager.doChartChat(userGoal, csvData, promptQuery);
             log.info("项目测试result:{} ",result);
 
             // 更新模型调用记录（success状态）
@@ -413,6 +413,7 @@ public class ChartController {
         final Long finalTaskLogId = taskLogId;
         final Long finalModelRecordId = modelRecordId;
         final Long chartId = chart.getId();
+        final String finalPromptQuery = promptQuery;
 
         // 执行异步任务
         String finalUserGoal = userGoal;
@@ -421,7 +422,7 @@ public class ChartController {
             Chart updateChartResult = new Chart();
             updateChartResult.setId(chartId);
             try {
-                String result = aiManager.doChartChat(finalUserGoal, csvData);
+                String result = aiManager.doChartChat(finalUserGoal, csvData, finalPromptQuery);
                 String[] splits = result.split("【【【【【");
                 if (splits.length < 3) {
                     chart.setStatus("failed");
@@ -559,7 +560,7 @@ public class ChartController {
         biResponse.setChartId(chart.getId());
 
         long newChartId = chart.getId();
-        biMessageProducer.sendMessage(String.valueOf(newChartId));
+        biMessageProducer.sendMessage(newChartId, promptId);
 
         return ResultUtils.success(biResponse);
     }

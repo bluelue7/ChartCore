@@ -33,6 +33,13 @@ public class AiManager {
     }
 
     /**
+     * 专门用于图表生成的方法（支持自定义prompt）
+     */
+    public String doChartChat(String goal, String csvData, String customPrompt) {
+        return localAiService.doChartChat(goal, csvData, customPrompt);
+    }
+
+    /**
      * 调用本地AI（返回详细信息）
      */
     public AiResponse doChatWithInfo(String message) {
@@ -44,5 +51,12 @@ public class AiManager {
      */
     public AiResponse doChartChatWithInfo(String goal, String csvData) {
         return localAiService.doChartChatWithInfo(goal, csvData);
+    }
+
+    /**
+     * 专门用于图表生成的方法（支持自定义prompt，返回详细信息）
+     */
+    public AiResponse doChartChatWithInfo(String goal, String csvData, String customPrompt) {
+        return localAiService.doChartChatWithInfo(goal, csvData, customPrompt);
     }
 }

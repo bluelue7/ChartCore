@@ -120,4 +120,24 @@ public class LocalAiServiceImpl implements LocalAiService {
                 "【【【【【\n" +
                 "{这里输出详细的数据分析结论}";
     }
+
+    @Override
+    public String doChartChat(String goal, String csvData, String customPrompt) {
+        return doChartChatWithInfo(goal, csvData, customPrompt).getContent();
+    }
+
+    @Override
+    public AiResponse doChartChatWithInfo(String goal, String csvData, String customPrompt) {
+        String prompt;
+        if (customPrompt != null && !customPrompt.isEmpty()) {
+            // 使用自定义prompt，拼接分析目标和数据
+            prompt = customPrompt + "\n====================\n" +
+                    "分析需求：\n" + goal + "\n" +
+                    "原始数据：\n" + csvData;
+        } else {
+            // 使用默认模板
+            prompt = buildChartPrompt(goal, csvData);
+        }
+        return doChatWithInfo(prompt);
+    }
 }
