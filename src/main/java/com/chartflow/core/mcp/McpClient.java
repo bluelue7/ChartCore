@@ -17,11 +17,20 @@ public class McpClient {
     private ObjectMapper objectMapper;
     private boolean initialized = false;
 
-    public McpClient(String serverPath) throws IOException {
+     public McpClient(String serverPath, String smtpServer, String smtpPort, 
+                     String smtpUser, String smtpPassword)  throws IOException {
         this.objectMapper = new ObjectMapper();
         try {
             ProcessBuilder pb = new ProcessBuilder("python", serverPath);
-            pb.redirectErrorStream(true);
+            
+            // 设置 SMTP 环境变量
+            Map<String, String> env = pb.environment();
+            env.put("SMTP_SERVER", smtpServer);
+            env.put("SMTP_PORT", smtpPort);
+            env.put("SMTP_USER", smtpUser);
+            env.put("SMTP_PASSWORD", smtpPassword);
+            
+            pb.redirectErrorStream(false);
             this.process = pb.start();
             this.reader = new BufferedReader(new InputStreamReader(process.getInputStream(), "UTF-8"));
             this.writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), "UTF-8"));
@@ -89,7 +98,7 @@ public class McpClient {
         if (responseLine == null) {
             throw new IOException("MCP 服务器连接中断");
         }
-        
+
         log.info("收到 MCP 响应: {}", responseLine);
         return objectMapper.readTree(responseLine);
     }
@@ -113,7 +122,11 @@ public class McpClient {
             JsonNode response = sendRequest(request);
             String type = response.get("type").asText();
             if ("tool_result".equals(type)) {
-                return response.get("success").asBoolean();
+                boolean success = response.get("success").asBoolean();
+                if (!success && response.has("content")) {
+                    log.error("邮件发送失败: {}", response.get("content").asText());
+                }
+                return success;
             }
             return false;
         } catch (Exception e) {
