@@ -111,6 +111,7 @@ public class BiMessageConsumer {
         try {
             AiResponse aiResponse = aiManager.doChartChatWithInfo(chart.getGoal(), chart.getChartData(), promptQuery);
             String result = aiResponse.getContent();
+            //log.info("receiveMessage result = {}", result);
             String[] splits = result.split("【【【【【");
             if (splits.length < 3) {
                 channel.basicNack(deliveryTag, false, false);

@@ -203,12 +203,12 @@ public class ChartController {
         // 校验文件
         long size = multipartFile.getSize();
         String originalFilename = multipartFile.getOriginalFilename();
-        // 校验文件大小
-        final long ONE_MB = 1024 * 1024L;
-        ThrowUtils.throwIf(size > ONE_MB, ErrorCode.PARAMS_ERROR, "文件超过 1M");
+        // 校验文件大小（支持更大的文件上传）
+        final long MAX_FILE_SIZE = 50 * 1024 * 1024L; // 50MB
+        ThrowUtils.throwIf(size > MAX_FILE_SIZE, ErrorCode.PARAMS_ERROR, "文件超过 50M");
         // 校验文件后缀 aaa.xlsx
         String suffix = FileUtil.getSuffix(originalFilename);
-        final List<String> validFileSuffixList = Arrays.asList("xlsx");
+        final List<String> validFileSuffixList = Arrays.asList("xlsx", "xls");
         ThrowUtils.throwIf(!validFileSuffixList.contains(suffix), ErrorCode.PARAMS_ERROR, "文件后缀非法");
 
         User loginUser = userService.getLoginUser(request);
@@ -254,13 +254,27 @@ public class ChartController {
         Long modelRecordId = null;
         String result = null;
         try {
+            // 构建完整的请求内容（传给AI的所有内容）
+            String fullRequestContent;
+            if (promptId != null && promptId > 0) {
+                // 使用自定义prompt
+                fullRequestContent = promptQuery + "\n====================\n" +
+                        "分析需求：\n" + userGoal + "\n" +
+                        "原始数据：\n" + csvData;
+            } else {
+                // 使用默认prompt
+                fullRequestContent = promptQuery + "\n" +
+                        "分析需求：\n" + userGoal + "\n" +
+                        "原始数据：\n" + csvData;
+            }
+
             // 插入模型调用记录（running状态）
             com.chartflow.core.model.dto.modelrecord.ModelRecordAddRequest modelRecordAddRequest = 
                 new com.chartflow.core.model.dto.modelrecord.ModelRecordAddRequest();
             modelRecordAddRequest.setUserId(loginUser.getId());
             modelRecordAddRequest.setModelName("qwen2.5:7b"); // 可以从配置读取
             modelRecordAddRequest.setInvocationType("chartGen");
-            modelRecordAddRequest.setRequestContent(userGoal + "\n" + csvData);
+            modelRecordAddRequest.setRequestContent(fullRequestContent);
             modelRecordAddRequest.setStatus("running");
             modelRecordId = modelRecordService.addModelRecord(modelRecordAddRequest);
 
@@ -335,10 +349,10 @@ public class ChartController {
         // 校验文件
         long size = multipartFile.getSize();
         String originalFilename = multipartFile.getOriginalFilename();
-        // 校验文件大小
-        final long ONE_MB = 1024 * 1024L;
-        ThrowUtils.throwIf(size > ONE_MB, ErrorCode.PARAMS_ERROR, "文件超过 1M");
-        // 校验文件后缀 aaa.png
+        // 校验文件大小（支持更大的文件上传）
+        final long MAX_FILE_SIZE = 50 * 1024 * 1024L; // 50MB
+        ThrowUtils.throwIf(size > MAX_FILE_SIZE, ErrorCode.PARAMS_ERROR, "文件超过 50M");
+        // 校验文件后缀
         String suffix = FileUtil.getSuffix(originalFilename);
         final List<String> validFileSuffixList = Arrays.asList("xlsx", "xls");
         ThrowUtils.throwIf(!validFileSuffixList.contains(suffix), ErrorCode.PARAMS_ERROR, "文件后缀非法");
@@ -374,6 +388,26 @@ public class ChartController {
         // 压缩后的数据
         String csvData = ExcelUtils.excelToCsv(multipartFile);
 
+        // 拼接分析目标
+        String userGoal = goal;
+        if (StringUtils.isNotBlank(chartType)) {
+            userGoal += "，请使用" + chartType;
+        }
+
+        // 构建完整的请求内容（传给AI的所有内容）
+        String fullRequestContent;
+        if (promptId != null && promptId > 0) {
+            // 使用自定义prompt
+            fullRequestContent = promptQuery + "\n====================\n" +
+                    "分析需求：\n" + userGoal + "\n" +
+                    "原始数据：\n" + csvData;
+        } else {
+            // 使用默认prompt
+            fullRequestContent = promptQuery + "\n" +
+                    "分析需求：\n" + userGoal + "\n" +
+                    "原始数据：\n" + csvData;
+        }
+
         // 插入到数据库
         Chart chart = new Chart();
         chart.setName(name);
@@ -397,15 +431,9 @@ public class ChartController {
         modelRecordAddRequest.setUserId(loginUser.getId());
         modelRecordAddRequest.setModelName("qwen2.5:7b");
         modelRecordAddRequest.setInvocationType("chartGen");
-        modelRecordAddRequest.setRequestContent(goal + "\n" + csvData);
+        modelRecordAddRequest.setRequestContent(fullRequestContent);
         modelRecordAddRequest.setStatus("running");
         Long modelRecordId = modelRecordService.addModelRecord(modelRecordAddRequest);
-
-        // 拼接分析目标
-        String userGoal = goal;
-        if (StringUtils.isNotBlank(chartType)) {
-            userGoal += "，请使用" + chartType;
-        }
 
         BiResponse biResponse = new BiResponse();
         biResponse.setChartId(chart.getId());
@@ -487,10 +515,10 @@ public class ChartController {
         // 校验文件
         long size = multipartFile.getSize();
         String originalFilename = multipartFile.getOriginalFilename();
-        // 校验文件大小
-        final long ONE_MB = 1024 * 1024L;
-        ThrowUtils.throwIf(size > ONE_MB, ErrorCode.PARAMS_ERROR, "文件超过 1M");
-        // 校验文件后缀 aaa.png
+        // 校验文件大小（支持更大的文件上传）
+        final long MAX_FILE_SIZE = 50 * 1024 * 1024L; // 50MB
+        ThrowUtils.throwIf(size > MAX_FILE_SIZE, ErrorCode.PARAMS_ERROR, "文件超过 50M");
+        // 校验文件后缀
         String suffix = FileUtil.getSuffix(originalFilename);
         final List<String> validFileSuffixList = Arrays.asList("xlsx", "xls");
         ThrowUtils.throwIf(!validFileSuffixList.contains(suffix), ErrorCode.PARAMS_ERROR, "文件后缀非法");
@@ -527,6 +555,26 @@ public class ChartController {
         // 压缩后的数据
         String csvData = ExcelUtils.excelToCsv(multipartFile);
 
+        // 拼接分析目标
+        String userGoal = goal;
+        if (StringUtils.isNotBlank(chartType)) {
+            userGoal += "，请使用" + chartType;
+        }
+
+        // 构建完整的请求内容（传给AI的所有内容）
+        String fullRequestContent;
+        if (promptId != null && promptId > 0) {
+            // 使用自定义prompt
+            fullRequestContent = promptQuery + "\n====================\n" +
+                    "分析需求：\n" + userGoal + "\n" +
+                    "原始数据：\n" + csvData;
+        } else {
+            // 使用默认prompt
+            fullRequestContent = promptQuery + "\n" +
+                    "分析需求：\n" + userGoal + "\n" +
+                    "原始数据：\n" + csvData;
+        }
+
         // 插入到数据库
         Chart chart = new Chart();
         chart.setName(name);
@@ -552,7 +600,7 @@ public class ChartController {
         modelRecordAddRequest.setUserId(loginUser.getId());
         modelRecordAddRequest.setModelName("qwen2.5:7b");
         modelRecordAddRequest.setInvocationType("chartGen");
-        modelRecordAddRequest.setRequestContent(goal + "\n" + csvData);
+        modelRecordAddRequest.setRequestContent(fullRequestContent);
         modelRecordAddRequest.setStatus("running");
         Long modelRecordId = modelRecordService.addModelRecord(modelRecordAddRequest);
 

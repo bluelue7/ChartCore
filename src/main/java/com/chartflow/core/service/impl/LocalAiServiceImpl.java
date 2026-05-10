@@ -138,6 +138,7 @@ public class LocalAiServiceImpl implements LocalAiService {
             // 使用默认模板
             prompt = buildChartPrompt(goal, csvData);
         }
+        //log.info("receiveMessage prompt = {}", prompt);
         return doChatWithInfo(prompt);
     }
 }
