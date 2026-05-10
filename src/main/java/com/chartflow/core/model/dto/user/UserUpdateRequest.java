@@ -35,5 +35,10 @@ public class UserUpdateRequest implements Serializable {
      */
     private String userRole;
 
+    /**
+     * 用户邮箱
+     */
+    private String email;
+
     private static final long serialVersionUID = 1L;
 }

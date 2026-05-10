@@ -42,6 +42,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     public long userRegister(String userAccount, String userPassword, String checkPassword) {
+        return userRegister(userAccount, userPassword, checkPassword, null);
+    }
+
+    @Override
+    public long userRegister(String userAccount, String userPassword, String checkPassword, String email) {
         // 1. 校验
         if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
@@ -56,6 +61,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (!userPassword.equals(checkPassword)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "两次输入的密码不一致");
         }
+        // 校验邮箱格式
+        if (StringUtils.isNotBlank(email) && !email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "邮箱格式不正确");
+        }
         synchronized (userAccount.intern()) {
             // 账户不能重复
             QueryWrapper<User> queryWrapper = new QueryWrapper<>();
@@ -64,12 +73,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             if (count > 0) {
                 throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号重复");
             }
+            // 邮箱不能重复
+            if (StringUtils.isNotBlank(email)) {
+                queryWrapper = new QueryWrapper<>();
+                queryWrapper.eq("email", email);
+                count = this.baseMapper.selectCount(queryWrapper);
+                if (count > 0) {
+                    throw new BusinessException(ErrorCode.PARAMS_ERROR, "邮箱已被注册");
+                }
+            }
             // 2. 加密
             String encryptPassword = DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
             // 3. 插入数据
             User user = new User();
             user.setUserAccount(userAccount);
             user.setUserPassword(encryptPassword);
+            user.setEmail(email);
             boolean saveResult = this.save(user);
             if (!saveResult) {
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, "注册失败，数据库错误");
