@@ -22,6 +22,7 @@ import com.chartflow.core.model.entity.Prompt;
 import com.chartflow.core.model.entity.User;
 import com.chartflow.core.model.vo.BiResponse;
 import com.chartflow.core.service.*;
+import com.chartflow.core.utils.EmailContentBuilder;
 import com.chartflow.core.utils.ExcelUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -74,6 +75,9 @@ public class ChartController {
 
     @Resource
     private TaskLogService taskLogService;
+
+    @Resource
+    private EmailService emailService;
 
     // region 增删改查
 
@@ -611,5 +615,57 @@ public class ChartController {
         biMessageProducer.sendMessage(newChartId, promptId);
 
         return ResultUtils.success(biResponse);
+    }
+
+    /**
+     * 智能分析（异步）并发送邮件通知
+     */
+    @PostMapping("/gen/async/notify")
+    public BaseResponse<BiResponse> genChartByAiAsyncWithNotify(
+            @RequestPart("file") MultipartFile multipartFile,
+            GenChartByAiRequest genChartByAiRequest,
+            HttpServletRequest request) {
+        
+        User loginUser = userService.getLoginUser(request);
+        
+        // 检查用户是否绑定邮箱
+        if (StringUtils.isBlank(loginUser.getEmail())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户未绑定邮箱，请先绑定邮箱");
+        }
+        
+        // 检查邮件服务是否可用
+        if (!emailService.isAvailable()) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "邮件服务暂不可用");
+        }
+        
+        // 调用异步生成接口
+        BaseResponse<BiResponse> response = genChartByAiAsync(multipartFile, genChartByAiRequest, request);
+        long chartId = response.getData().getChartId();
+        
+        // 异步发送邮件通知
+        final String userEmail = loginUser.getEmail();
+        new Thread(() -> {
+            try {
+                int maxRetries = 30;
+                Chart chart = null;
+                for (int i = 0; i < maxRetries; i++) {
+                    chart = chartService.getById(chartId);
+                    if (chart != null && "succeed".equals(chart.getStatus())) {
+                        break;
+                    }
+                    Thread.sleep(2000);
+                }
+                
+                if (chart != null && "succeed".equals(chart.getStatus())) {
+                    String subject = "图表生成完成 - " + (StringUtils.isNotBlank(chart.getName()) ? chart.getName() : "未命名图表");
+                    String htmlContent = EmailContentBuilder.buildChartNotificationEmail(chart);
+                    emailService.sendHtmlEmail(userEmail, subject, htmlContent);
+                }
+            } catch (Exception e) {
+                log.error("发送邮件通知失败", e);
+            }
+        }).start();
+        
+        return response;
     }
 }

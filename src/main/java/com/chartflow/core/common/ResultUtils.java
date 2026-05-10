@@ -36,7 +36,7 @@ public class ResultUtils {
      * @return
      */
     public static BaseResponse error(int code, String message) {
-        return new BaseResponse(code, null, message);
+        return new BaseResponse<>(code, null, message);
     }
 
     /**
@@ -46,6 +46,6 @@ public class ResultUtils {
      * @return
      */
     public static BaseResponse error(ErrorCode errorCode, String message) {
-        return new BaseResponse(errorCode.getCode(), null, message);
+        return new BaseResponse<>(errorCode.getCode(), null, message);
     }
 }

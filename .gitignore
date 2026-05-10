@@ -149,3 +149,6 @@ fabric.properties
 # Android studio 3.1+ serialized cache file
 .idea/caches/build_file_checksums.ser
 
+# MCP 服务器
+mcp_server/start_mcp_server.bat
+mcp_server/start_mcp_server.sh

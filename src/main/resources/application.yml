@@ -111,3 +111,7 @@ logging:
 ollama:
   base-url: http://localhost:11434/v1
   model: qwen2.5:7b
+
+mcp:
+  email:
+    server-path: ./mcp_server/mcp_email_server.py
