@@ -148,14 +148,14 @@ public class ChartController {
     }
 
     /**
-     * 根据 id 获取
+     * 获取单个图表详情
      *
      * @param id
      * @param request
      * @return
      */
-    @GetMapping("/get")
-    public BaseResponse<Chart> getChartById(long id, HttpServletRequest request) {
+    @GetMapping("/{id}")
+    public BaseResponse<Chart> getChartById(@PathVariable long id, HttpServletRequest request) {
         if (id <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -163,11 +163,54 @@ public class ChartController {
         if (chart == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
         }
+        // 检查权限：只能查看自己的图表或管理员可以查看所有
+        User loginUser = userService.getLoginUser(request);
+        if (!chart.getUserId().equals(loginUser.getId()) && !userService.isAdmin(request)) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
         return ResultUtils.success(chart);
     }
 
     /**
-     * 分页获取列表
+     * 获取当前用户的图表列表（分页）
+     *
+     * @param chartQueryRequest
+     * @param request
+     * @return
+     */
+    @GetMapping("/my")
+    public BaseResponse<Page<Chart>> listMyChartByPage(ChartQueryRequest chartQueryRequest,
+            HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        long current = chartQueryRequest.getCurrent();
+        long size = chartQueryRequest.getPageSize();
+        QueryWrapper<Chart> queryWrapper = chartService.getQueryWrapper(chartQueryRequest);
+        // 只查询当前用户的图表
+        queryWrapper.eq("user_id", loginUser.getId());
+        Page<Chart> chartPage = chartService.page(new Page<>(current, size), queryWrapper);
+        return ResultUtils.success(chartPage);
+    }
+
+    /**
+     * 获取所有图表列表（管理员）
+     *
+     * @param chartQueryRequest
+     * @param request
+     * @return
+     */
+    @GetMapping("")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Page<Chart>> listAllChartByPage(ChartQueryRequest chartQueryRequest,
+            HttpServletRequest request) {
+        long current = chartQueryRequest.getCurrent();
+        long size = chartQueryRequest.getPageSize();
+        QueryWrapper<Chart> queryWrapper = chartService.getQueryWrapper(chartQueryRequest);
+        Page<Chart> chartPage = chartService.page(new Page<>(current, size), queryWrapper);
+        return ResultUtils.success(chartPage);
+    }
+
+    /**
+     * 分页获取列表（保留原有接口，兼容旧版调用）
      *
      * @param chartQueryRequest
      * @param request
@@ -239,7 +282,7 @@ public class ChartController {
                     "{csv格式的原始数据，用,作为分隔符}\n" +
                     "请根据这两部分内容，按照以下指定格式生成内容（此外不要输出任何多余的开头、结尾、注释）\n" +
                     "【【【【【\n" +
-                    "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
+                    "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释，直接以{\"title\": {开头}\n" +
                     "【【【【【\n" +
                     "{明确的数据分析结论、越详细越好，不要生成多余的注释}";
         }
@@ -384,7 +427,7 @@ public class ChartController {
                     "{csv格式的原始数据，用,作为分隔符}\n" +
                     "请根据这两部分内容，按照以下指定格式生成内容（此外不要输出任何多余的开头、结尾、注释）\n" +
                     "【【【【【\n" +
-                    "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
+                    "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释，以 {\"title\": { 开头 " +
                     "【【【【【\n" +
                     "{明确的数据分析结论、越详细越好，不要生成多余的注释}";
         }
@@ -551,7 +594,7 @@ public class ChartController {
                     "{csv格式的原始数据，用,作为分隔符}\n" +
                     "请根据这两部分内容，按照以下指定格式生成内容（此外不要输出任何多余的开头、结尾、注释）\n" +
                     "【【【【【\n" +
-                    "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
+                    "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释，直接以{\n\"title\": {开头" +
                     "【【【【【\n" +
                     "{明确的数据分析结论、越详细越好，不要生成多余的注释}";
         }

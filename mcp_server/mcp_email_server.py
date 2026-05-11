@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-MCP Email Server - Debug Version
+MCP Email Server - 简化版
+图表图片由 Java + Node.js 生成，此服务仅负责发送邮件
 """
 
 import json
 import sys
 import smtplib
 import os
-from email.mime.text import MIMEText
-from email.header import Header
-import smtplib
+import base64
+import traceback
 
 # 读取环境变量
 SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.qq.com')
@@ -18,41 +18,44 @@ SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
 SMTP_USER = os.environ.get('SMTP_USER', '')
 SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
 
+def log(msg):
+    """输出日志到 stderr"""
+    print(f"[MCP] {msg}", file=sys.stderr, flush=True)
+
 def clean_text(text):
     """清理无效的 Unicode 字符"""
     if not text:
         return ''
-    
-    # 移除代理对和无效字符
-    cleaned = []
-    i = 0
-    while i < len(text):
-        code = ord(text[i])
-        # 跳过代理对 (surrogate pairs)
-        if 0xD800 <= code <= 0xDFFF:
-            i += 1
-        else:
-            cleaned.append(text[i])
-        i += 1
-    
-    return ''.join(cleaned)
+    return text.encode('utf-8', 'replace').decode('utf-8')
 
 def send_email(to_email, subject, html_content):
-    """发送邮件并返回结果和错误信息"""
+    """发送邮件（图表图片已由 Java + Node.js 生成）"""
     try:
-        # 检查配置
         if not SMTP_USER or not SMTP_PASSWORD:
             return False, "SMTP_USER or SMTP_PASSWORD not set"
-            
-        # 清理无效的 Unicode 字符
-#         to_email = clean_text(to_email)
-#         subject = clean_text(subject)
-#         html_content = clean_text(html_content)
         
-        msg = MIMEText(html_content, 'html', 'utf-8')
+        log(f"发送邮件到: {to_email}")
+        
+        # 清理内容
+        to_email = clean_text(to_email)
+        subject = clean_text(subject)
+        html_content = clean_text(html_content)
+        
+        # 创建邮件
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        
+        msg = MIMEMultipart('alternative')
         msg['From'] = SMTP_USER
         msg['To'] = to_email
-        msg['Subject'] = Header(subject, 'utf-8')
+        
+        # 编码主题
+        encoded_subject = '=?UTF-8?B?' + base64.b64encode(subject.encode('utf-8')).decode('ascii') + '?='
+        msg['Subject'] = encoded_subject
+        
+        # 添加 HTML 内容
+        html_part = MIMEText(html_content, 'html', 'utf-8')
+        msg.attach(html_part)
         
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30)
         
@@ -63,19 +66,24 @@ def send_email(to_email, subject, html_content):
         finally:
             server.quit()
         
+        log("邮件发送成功")
         return True, "Success"
         
     except smtplib.SMTPAuthenticationError:
-        return False, "Authentication failed - check username/password"
+        return False, "Authentication failed"
     except smtplib.SMTPConnectError:
         return False, f"Connection failed to {SMTP_SERVER}:{SMTP_PORT}"
     except Exception as e:
+        log(f"邮件发送失败: {str(e)}")
+        log(traceback.format_exc())
         return False, f"Error: {type(e).__name__}: {str(e)}"
 
 def main():
-    # 确保 stdin/stdout 使用 utf-8
+    log("MCP Email Server 启动...")
+    
     sys.stdin = open(sys.stdin.fileno(), 'r', encoding='utf-8', closefd=False)
     sys.stdout = open(sys.stdout.fileno(), 'w', encoding='utf-8', closefd=False)
+    
     while True:
         line = sys.stdin.readline()
         if not line:
@@ -118,7 +126,7 @@ def main():
                 resp = {
                     'type': 'tool_result',
                     'success': success,
-                    'content': message  # 添加错误信息
+                    'content': message
                 }
             else:
                 resp = {'type': 'error', 'content': 'Unknown request type'}
@@ -126,6 +134,7 @@ def main():
             print(json.dumps(resp))
             sys.stdout.flush()
         except Exception as e:
+            log(f"处理请求失败: {str(e)}")
             resp = {'type': 'error', 'content': f'Error: {str(e)}'}
             print(json.dumps(resp))
             sys.stdout.flush()

@@ -1,8 +1,20 @@
 package com.chartflow.core.utils;
 
 import com.chartflow.core.model.entity.Chart;
+import com.chartflow.core.service.ChartImageService;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class EmailContentBuilder {
+
+    private static ChartImageService chartImageService;
+
+    /**
+     * 设置 ChartImageService（用于生成图表图片）
+     */
+    public static void setChartImageService(ChartImageService service) {
+        chartImageService = service;
+    }
 
     public static String buildChartNotificationEmail(Chart chart) {
         StringBuilder html = new StringBuilder();
@@ -17,7 +29,8 @@ public class EmailContentBuilder {
         html.append(".result-box { background: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; }\n");
         html.append("h1 { margin: 0; }\n");
         html.append("h2 { color: #333; }\n");
-        html.append(".chart-container { width: 100%; height: 400px; }\n");
+        html.append(".chart-container { width: 100%; }\n");
+        html.append(".chart-image { width: 100%; max-width: 800px; height: auto; }\n");
         html.append("</style>\n</head>\n<body>\n");
         
         html.append("<div class=\"header\">\n<h1>📊 图表生成完成通知</h1>\n</div>\n");
@@ -30,9 +43,16 @@ public class EmailContentBuilder {
         if (chart.getGenChart() != null) {
             html.append("<h2>图表预览</h2>\n");
             html.append("<div class=\"chart-container\">\n");
-            html.append("<script src=\"https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js\"></script>\n");
-            html.append("<div id=\"chart\" style=\"width:100%;height:100%;\"></div>\n");
-            html.append("<script>var chart=echarts.init(document.getElementById('chart'));var option=").append(chart.getGenChart()).append(";chart.setOption(option);</script>\n");
+            
+            // 尝试生成图片
+            String chartUrl = generateChartImage(chart.getGenChart());
+            if (chartUrl != null) {
+                html.append("<img class=\"chart-image\" src=\"").append(chartUrl).append("\" alt=\"图表预览\" />\n");
+            } else {
+                // 备用方案：显示图表配置（调试用）
+                html.append("<p>图表图片生成失败，请至系统中查看图片</p>\n");
+            }
+            
             html.append("</div>\n");
         }
         html.append("</div>\n");
@@ -45,6 +65,44 @@ public class EmailContentBuilder {
         html.append("</div>\n</body>\n</html>");
         
         return html.toString();
+    }
+
+    /**
+     * 生成图表图片并上传到 OSS
+     */
+    private static String generateChartImage(String chartOption) {
+        if (chartImageService == null) {
+            log.warn("ChartImageService 未设置，无法生成图表图片");
+            return null;
+        }
+        
+        try {
+            // 清理图表配置
+            String cleanOption = cleanChartOption(chartOption);
+            return chartImageService.generateAndUploadChart(cleanOption);
+        } catch (Exception e) {
+            log.error("生成图表图片失败", e);
+            return null;
+        }
+    }
+
+    private static String cleanChartOption(String option) {
+        if (option == null) return "";
+        
+        String cleaned = option.replace("```javascript", "").replace("```", "").trim();
+        
+        if (cleaned.startsWith("option = ")) {
+            cleaned = cleaned.substring(10).trim();
+        }
+        
+        if (!cleaned.startsWith("{")) {
+            int start = cleaned.indexOf("{");
+            if (start != -1) {
+                cleaned = cleaned.substring(start);
+            }
+        }
+        
+        return cleaned;
     }
 
     private static String escapeHtml(String text) {

@@ -116,7 +116,7 @@ public class LocalAiServiceImpl implements LocalAiService {
                 "原始数据：\n" + csvData + "\n\n" +
                 "请严格按照以下格式生成内容（不要输出任何其他文字）：\n" +
                 "【【【【【\n" +
-                "{这里输出ECharts V5的option配置对象JSON代码，合理地进行数据可视化}\n" +
+                "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释，直接以{\n\"title\": {开头}\n" +
                 "【【【【【\n" +
                 "{这里输出详细的数据分析结论}";
     }

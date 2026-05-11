@@ -152,3 +152,4 @@ fabric.properties
 # MCP 服务器
 mcp_server/start_mcp_server.bat
 mcp_server/start_mcp_server.sh
+mcp_server/node_modules
