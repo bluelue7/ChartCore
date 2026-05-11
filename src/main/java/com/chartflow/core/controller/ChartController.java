@@ -186,7 +186,7 @@ public class ChartController {
         long size = chartQueryRequest.getPageSize();
         QueryWrapper<Chart> queryWrapper = chartService.getQueryWrapper(chartQueryRequest);
         // 只查询当前用户的图表
-        queryWrapper.eq("user_id", loginUser.getId());
+        queryWrapper.eq("userId", loginUser.getId());
         Page<Chart> chartPage = chartService.page(new Page<>(current, size), queryWrapper);
         return ResultUtils.success(chartPage);
     }
@@ -209,22 +209,6 @@ public class ChartController {
         return ResultUtils.success(chartPage);
     }
 
-    /**
-     * 分页获取列表（保留原有接口，兼容旧版调用）
-     *
-     * @param chartQueryRequest
-     * @param request
-     * @return
-     */
-    @PostMapping("/list/page")
-    public BaseResponse<Page<Chart>> listChartByPage(@RequestBody ChartQueryRequest chartQueryRequest,
-            HttpServletRequest request) {
-        long current = chartQueryRequest.getCurrent();
-        long size = chartQueryRequest.getPageSize();
-        QueryWrapper<Chart> queryWrapper = chartService.getQueryWrapper(chartQueryRequest);
-        Page<Chart> chartPage = chartService.page(new Page<>(current, size), queryWrapper);
-        return ResultUtils.success(chartPage);
-    }
 
     // endregion
 
