@@ -9,11 +9,15 @@ import com.chartflow.core.model.entity.Chart;
 import com.chartflow.core.model.entity.ModelRecord;
 import com.chartflow.core.model.entity.Prompt;
 import com.chartflow.core.model.entity.TaskLog;
+import com.chartflow.core.model.entity.User;
 import com.chartflow.core.model.vo.AiResponse;
 import com.chartflow.core.service.ChartService;
+import com.chartflow.core.service.EmailService;
 import com.chartflow.core.service.ModelRecordService;
 import com.chartflow.core.service.PromptService;
 import com.chartflow.core.service.TaskLogService;
+import com.chartflow.core.service.UserService;
+import com.chartflow.core.utils.EmailContentBuilder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import lombok.SneakyThrows;
@@ -44,6 +48,12 @@ public class BiMessageConsumer {
 
     @Resource
     private PromptService promptService;
+
+    @Resource
+    private UserService userService;
+
+    @Resource
+    private EmailService emailService;
 
     @Resource
     private ObjectMapper objectMapper;
@@ -105,21 +115,30 @@ public class BiMessageConsumer {
         boolean b = chartService.updateById(updateChart);
         if (!b) {
             channel.basicNack(deliveryTag, false, false);
-            handleChartUpdateError(chart.getId(), "更新图表执行中状态失败", taskLog, modelRecord, startTime);
+            handleChartUpdateError(chart.getId(), "更新图表执行中状态失败", taskLog, modelRecord, startTime, null);
             return;
         }
         try {
             AiResponse aiResponse = aiManager.doChartChatWithInfo(chart.getGoal(), chart.getChartData(), promptQuery);
             String result = aiResponse.getContent();
-            //log.info("receiveMessage result = {}", result);
-            String[] splits = result.split("【【【【【");
-            if (splits.length < 3) {
+            
+            // 使用健壮的解析方法提取图表配置和分析结论
+            String[] parts = parseAiResponse(result);
+            
+            if (parts == null || parts[0] == null || parts[1] == null) {
                 channel.basicNack(deliveryTag, false, false);
-                handleChartUpdateError(chart.getId(), "AI 生成错误", taskLog, modelRecord, startTime);
+                handleChartUpdateError(chart.getId(), "AI 生成格式错误，无法解析", taskLog, modelRecord, startTime, result);
                 return;
             }
-            String genChart = splits[1].trim();
-            String genResult = splits[2].trim();
+            
+            String genChart = parts[0];
+            String genResult = parts[1];
+            
+            // 验证图表配置是否为有效的 JSON
+            if (!isValidJson(genChart)) {
+                log.warn("图表配置不是有效的 JSON: {}", genChart.substring(0, Math.min(100, genChart.length())));
+            }
+            
             Chart updateChartResult = new Chart();
             updateChartResult.setId(chart.getId());
             updateChartResult.setGenChart(genChart);
@@ -128,7 +147,7 @@ public class BiMessageConsumer {
             boolean updateResult = chartService.updateById(updateChartResult);
             if (!updateResult) {
                 channel.basicNack(deliveryTag, false, false);
-                handleChartUpdateError(chart.getId(), "更新图表成功状态失败", taskLog, modelRecord, startTime);
+                handleChartUpdateError(chart.getId(), "更新图表成功状态失败", taskLog, modelRecord, startTime, result);
                 return;
             }
 
@@ -141,16 +160,130 @@ public class BiMessageConsumer {
                         aiResponse.getInputTokens(), aiResponse.getOutputTokens(), aiResponse.getTotalTokens());
             }
 
+            // 发送邮件通知
+            sendEmailNotification(chart.getId());
+
             channel.basicAck(deliveryTag, false);
         } catch (Exception e) {
             channel.basicNack(deliveryTag, false, false);
-            handleChartUpdateError(chart.getId(), e.getMessage(), taskLog, modelRecord, startTime);
+            handleChartUpdateError(chart.getId(), e.getMessage(), taskLog, modelRecord, startTime, null);
             throw e;
         }
     }
 
+    /**
+     * 健壮地解析 AI 返回的内容，支持多种格式变化
+     */
+    private String[] parseAiResponse(String content) {
+        if (content == null || content.isEmpty()) {
+            return null;
+        }
+        
+        String delimiter = "【【【【【";
+        
+        // 方法1：严格按分隔符分割
+        String[] splits = content.split(delimiter);
+        if (splits.length >= 3) {
+            String genChart = splits[1].trim();
+            String genResult = splits[2].trim();
+            if (!genChart.isEmpty() && !genResult.isEmpty()) {
+                return new String[]{genChart, genResult};
+            }
+        }
+        
+        // 方法2：查找最后出现的分隔符
+        int lastIndex = content.lastIndexOf(delimiter);
+        if (lastIndex > 0) {
+            int secondLast = content.lastIndexOf(delimiter, lastIndex - 1);
+            if (secondLast >= 0) {
+                String genChart = content.substring(secondLast + delimiter.length(), lastIndex).trim();
+                String genResult = content.substring(lastIndex + delimiter.length()).trim();
+                if (!genChart.isEmpty() && !genResult.isEmpty()) {
+                    return new String[]{genChart, genResult};
+                }
+            }
+        }
+        
+        // 方法3：使用括号匹配分割
+        int firstBrace = content.indexOf("{");
+        int lastBrace = content.lastIndexOf("}");
+        if (firstBrace >= 0 && lastBrace > firstBrace) {
+            String afterChart = content.substring(lastBrace + 1).trim();
+            if (!afterChart.isEmpty()) {
+                return new String[]{content.substring(firstBrace, lastBrace + 1), afterChart};
+            }
+        }
+        
+        // 方法4：有2个分隔符的情况
+        int count = countOccurrences(content, delimiter);
+        if (count >= 2) {
+            int firstIdx = content.indexOf(delimiter);
+            int secondIdx = content.indexOf(delimiter, firstIdx + delimiter.length());
+            if (secondIdx > 0) {
+                String genChart = content.substring(firstIdx + delimiter.length(), secondIdx).trim();
+                String genResult = content.substring(secondIdx + delimiter.length()).trim();
+                if (!genChart.isEmpty() && !genResult.isEmpty()) {
+                    return new String[]{genChart, genResult};
+                }
+            }
+        }
+        
+        log.error("无法解析 AI 返回内容: {}", content.substring(0, Math.min(300, content.length())));
+        return null;
+    }
 
-    private void handleChartUpdateError(long chartId, String execMessage, TaskLog taskLog, ModelRecord modelRecord, long startTime) {
+    private int countOccurrences(String str, String sub) {
+        int count = 0, idx = 0;
+        while ((idx = str.indexOf(sub, idx)) != -1) {
+            count++;
+            idx += sub.length();
+        }
+        return count;
+    }
+
+    private boolean isValidJson(String str) {
+        if (str == null || str.isEmpty()) return false;
+        str = str.trim();
+        return (str.startsWith("{") && str.endsWith("}")) ||
+               (str.startsWith("[") && str.endsWith("]"));
+    }
+
+    /**
+     * 发送邮件通知
+     */
+    private void sendEmailNotification(Long chartId) {
+        try {
+            Chart chart = chartService.getById(chartId);
+            if (chart == null) {
+                log.warn("发送邮件通知失败: 图表不存在, chartId={}", chartId);
+                return;
+            }
+
+            // 获取用户信息
+            User user = userService.getById(chart.getUserId());
+            if (user == null || StringUtils.isBlank(user.getEmail())) {
+                log.warn("发送邮件通知失败: 用户未绑定邮箱, chartId={}, userId={}", chartId, chart.getUserId());
+                return;
+            }
+
+            // 检查邮件服务是否可用
+            if (!emailService.isAvailable()) {
+                log.warn("发送邮件通知失败: 邮件服务不可用, chartId={}", chartId);
+                return;
+            }
+
+            String subject = "图表生成完成 - " + (StringUtils.isNotBlank(chart.getName()) ? chart.getName() : "未命名图表");
+            String htmlContent = EmailContentBuilder.buildChartNotificationEmail(chart);
+            emailService.sendHtmlEmail(user.getEmail(), subject, htmlContent);
+            log.info("邮件通知发送成功: chartId={}, email={}", chartId, user.getEmail());
+
+        } catch (Exception e) {
+            log.error("发送邮件通知异常: chartId={}", chartId, e);
+        }
+    }
+
+
+    private void handleChartUpdateError(long chartId, String execMessage, TaskLog taskLog, ModelRecord modelRecord, long startTime, String result) {
         Chart updateChartResult = new Chart();
         updateChartResult.setId(chartId);
         updateChartResult.setStatus("failed");
@@ -165,7 +298,7 @@ public class BiMessageConsumer {
             taskLogService.updateTaskLogStatus(taskLog.getId(), "failed", costMs, execMessage);
         }
         if (modelRecord != null) {
-            modelRecordService.updateModelRecordStatus(modelRecord.getId(), "failed", null, execMessage, costMs);
+            modelRecordService.updateModelRecordStatus(modelRecord.getId(), "failed", result, execMessage, costMs);
         }
     }
 }

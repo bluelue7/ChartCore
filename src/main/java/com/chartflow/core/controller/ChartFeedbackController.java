@@ -203,6 +203,7 @@ public class ChartFeedbackController {
      * @param size 每页大小
      * @return 分页结果
      */
+    @Deprecated
     @GetMapping("/list/chart")
     public BaseResponse<Page<ChartFeedback>> listFeedbackByChart(@RequestParam long chartId,
             @RequestParam(defaultValue = "1") long page, @RequestParam(defaultValue = "10") long size) {

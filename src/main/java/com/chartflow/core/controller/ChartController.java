@@ -490,7 +490,7 @@ public class ChartController {
                     taskLogService.updateTaskLogStatus(finalTaskLogId, "failed", 
                         (int)(System.currentTimeMillis() - startTime), "AI生成格式错误");
                     // 更新模型调用记录（failed状态）
-                    modelRecordService.updateModelRecordStatus(finalModelRecordId, "failed", null, 
+                    modelRecordService.updateModelRecordStatus(finalModelRecordId, "failed", result,
                         "AI生成格式错误", (int)(System.currentTimeMillis() - startTime));
                     log.error("AI 生成错误");
                     return;
@@ -513,7 +513,7 @@ public class ChartController {
                 // 更新任务日志（failed状态）
                 taskLogService.updateTaskLogStatus(finalTaskLogId, "failed", costMs, e.getMessage());
                 // 更新模型调用记录（failed状态）
-                modelRecordService.updateModelRecordStatus(finalModelRecordId, "failed", null, 
+                modelRecordService.updateModelRecordStatus(finalModelRecordId, "failed", null,
                     e.getMessage(), costMs);
                 log.error("gen_chart_error", e);
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI 生成错误");
@@ -593,18 +593,9 @@ public class ChartController {
         }
 
         // 构建完整的请求内容（传给AI的所有内容）
-        String fullRequestContent;
-        if (promptId != null && promptId > 0) {
-            // 使用自定义prompt
-            fullRequestContent = promptQuery + "\n====================\n" +
+        String fullRequestContent = promptQuery + "\n" +
                     "分析需求：\n" + userGoal + "\n" +
                     "原始数据：\n" + csvData;
-        } else {
-            // 使用默认prompt
-            fullRequestContent = promptQuery + "\n" +
-                    "分析需求：\n" + userGoal + "\n" +
-                    "原始数据：\n" + csvData;
-        }
 
         // 插入到数据库
         Chart chart = new Chart();

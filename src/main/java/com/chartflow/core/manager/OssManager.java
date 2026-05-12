@@ -63,6 +63,13 @@ public class OssManager {
     }
 
     /**
+     * 获取Endpoint名称
+     *
+     * @return
+     */
+    public String getEndpoint() { return ossClientConfig.getEndpoint(); }
+
+    /**
      * 校验OSS客户端是否可用
      */
     private void validateOssClient() {

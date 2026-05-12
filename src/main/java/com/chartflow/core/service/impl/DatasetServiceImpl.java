@@ -52,6 +52,15 @@ public class DatasetServiceImpl extends ServiceImpl<DatasetMapper, Dataset>
 
         // 生成文件名
         String originalFilename = file.getOriginalFilename();
+
+        // 检查是否存在同名文件（同一用户）
+        Dataset existDataset = checkDuplicateFile(userId, originalFilename);
+        if (existDataset != null) {
+            log.info("数据集已存在: userId={}, datasetId={}, fileName={}",
+                    userId, existDataset.getId(), originalFilename);
+            return existDataset;
+        }
+
         String uuid = RandomStringUtils.randomAlphanumeric(8);
         String filename = uuid + "-" + originalFilename;
         String ossKey = String.format("%s/%s/%s", DATASET_DIR, userId, filename);
@@ -71,7 +80,7 @@ public class DatasetServiceImpl extends ServiceImpl<DatasetMapper, Dataset>
             // 构建Dataset实体
             Dataset dataset = new Dataset();
             dataset.setName(originalFilename);
-            dataset.setFilePath("oss://" + ossManager.getBucket() + "/" + ossKey);
+            dataset.setFilePath("https://" + ossManager.getBucket() +"."+ossManager.getEndpoint()+ "/" + ossKey);
             dataset.setRowCount(metaInfo.rowCount);
             dataset.setColumnCount(metaInfo.columnCount);
             dataset.setColumnMeta(metaInfo.columnMeta);
@@ -83,7 +92,7 @@ public class DatasetServiceImpl extends ServiceImpl<DatasetMapper, Dataset>
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, "保存数据集失败");
             }
 
-            log.info("数据集上传成功: userId={}, datasetId={}, filePath={}", 
+            log.info("数据集上传成功: userId={}, datasetId={}, filePath={}",
                     userId, dataset.getId(), dataset.getFilePath());
             return dataset;
 
@@ -98,6 +107,24 @@ public class DatasetServiceImpl extends ServiceImpl<DatasetMapper, Dataset>
                 }
             }
         }
+    }
+
+    /**
+     * 检查是否存在同名文件（同一用户）
+     *
+     * @param userId 用户ID
+     * @param fileName 文件名
+     * @return 如果存在则返回已存在的数据集，否则返回null
+     */
+    private Dataset checkDuplicateFile(Long userId, String fileName) {
+        if (userId == null || fileName == null || fileName.isEmpty()) {
+            return null;
+        }
+        QueryWrapper<Dataset> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("userId", userId);
+        queryWrapper.eq("name", fileName);
+        queryWrapper.eq("isDelete", 0);
+        return this.getOne(queryWrapper);
     }
 
     /**
