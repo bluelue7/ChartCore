@@ -1,176 +1,194 @@
-# SpringBoot 项目初始模板
+# ChartCore - 智能数据分析系统
 
-基于 Java SpringBoot 的项目初始模板，整合了常用框架和主流业务的示例代码。
-只需 1 分钟即可完成内容网站的后端！！！大家还可以在此基础上快速开发自己的项目。
+基于 Java SpringBoot 的智能数据分析系统，支持通过 AI 自动生成数据可视化图表和分析报告。
 
-[toc]
+## 功能特性
 
-## 模板特点
+### 核心功能
+- **智能图表生成**：上传 Excel 数据文件，AI 自动分析并生成 ECharts 可视化图表
+- **三种生成模式**：同步生成、异步线程池生成、MQ 消息队列异步生成
+- **Prompt 模板管理**：支持自定义分析模板，灵活控制 AI 输出格式
+- **邮件通知**：图表生成完成后自动发送邮件通知用户
+- **任务日志**：完整记录图表生成任务状态和执行时间
+- **模型调用记录**：记录 AI 模型调用详情，包括 Token 消耗
+
+### 用户管理
+- 用户注册、登录、注销
+- 密码加密存储
+- 权限控制（普通用户/管理员）
+
+### 数据集管理
+- Excel 文件上传和解析
+- 数据集去重校验
+- 数据持久化存储
+
+## 技术栈
+
 ### 主流框架 & 特性
-
-- Spring Boot 2.7.x（贼新）
+- Spring Boot 2.7.x
 - Spring MVC
 - MyBatis + MyBatis Plus 数据访问（开启分页）
-- Spring Boot 调试工具和项目处理器
 - Spring AOP 切面编程
-- Spring Scheduler 定时任务
-- Spring 事务注解
+- Spring Session
 
 ### 数据存储
-
 - MySQL 数据库
-- Redis 内存数据库
-- Elasticsearch 搜索引擎
-- 腾讯云 COS 对象存储
+- Redis 内存数据库（限流、缓存）
+- RabbitMQ 消息队列
+
+### AI 集成
+- Ollama 本地大模型服务
+- 支持自定义 Prompt 模板
 
 ### 工具类
-
 - Easy Excel 表格处理
 - Hutool 工具库
 - Apache Commons Lang3 工具类
 - Lombok 注解
 
-### 业务特性
-
-- 业务代码生成器（支持自动生成 Service、Controller、数据模型代码）
-- Spring Session Redis 分布式登录
-- 全局请求响应拦截器（记录日志）
-- 全局异常处理器
-- 自定义错误码
-- 封装通用响应类
+### 接口文档
 - Swagger + Knife4j 接口文档
-- 自定义权限注解 + 全局校验
-- 全局跨域处理
-- 长整数丢失精度解决
-- 多环境配置
-
-
-## 业务功能
-
-- 提供示例 SQL（用户、帖子、帖子点赞、帖子收藏表）
-- 用户登录、注册、注销、更新、检索、权限管理
-- 帖子创建、删除、编辑、更新、数据库检索、ES 灵活检索
-- 帖子点赞、取消点赞
-- 帖子收藏、取消收藏、检索已收藏帖子
-- 帖子全量同步 ES、增量同步 ES 定时任务
-- 支持微信开放平台登录
-- 支持微信公众号订阅、收发消息、设置菜单
-- 支持分业务的文件上传
-
-### 单元测试
-
-- JUnit5 单元测试
-- 示例单元测试类
-
-### 架构设计
-
-- 合理分层
-
 
 ## 快速上手
 
-> 所有需要修改的地方都标记了 `todo`，便于大家找到修改的位置~
+### 环境要求
+- JDK 1.8+
+- MySQL 5.7+
+- Redis 6.0+
+- RabbitMQ 3.8+（可选，用于 MQ 模式）
+- Ollama（本地 AI 模型）
 
-### MySQL 数据库
+### 配置步骤
 
-1）修改 `application.yml` 的数据库配置为你自己的：
-
-```yml
+1. **修改数据库配置** (`application.yml`)：
+```yaml
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/my_db
+    url: jdbc:mysql://localhost:3306/chart_flow_db
     username: root
     password: 123456
 ```
 
-2）执行 `sql/create_table.sql` 中的数据库语句，自动创建库表
-
-3）启动项目，访问 `http://localhost:8101/api/doc.html` 即可打开接口文档，不需要写前端就能在线调试接口了~
-
-![](doc/swagger.png)
-
-### Redis 分布式登录
-
-1）修改 `application.yml` 的 Redis 配置为你自己的：
-
-```yml
-spring:
-  redis:
-    database: 1
-    host: localhost
-    port: 6379
-    timeout: 5000
-    password: 123456
+2. **执行数据库脚本**：
+```bash
+执行 sql/create_table.sql 创建数据库表
 ```
 
-2）修改 `application.yml` 中的 session 存储方式：
-
-```yml
-spring:
-  session:
-    store-type: redis
+3. **启动 Ollama 服务**：
+```bash
+ollama run qwen2.5:7b
 ```
 
-3）移除 `MainApplication` 类开头 `@SpringBootApplication` 注解内的 exclude 参数：
-
-修改前：
-
-```java
-@SpringBootApplication(exclude = {RedisAutoConfiguration.class})
+4. **启动项目**：
+```bash
+mvn spring-boot:run
 ```
 
-修改后：
-
-
-```java
-@SpringBootApplication
+5. **访问接口文档**：
+```
+http://localhost:8101/api/doc.html
 ```
 
-### Elasticsearch 搜索引擎
+## 核心 API
 
-1）修改 `application.yml` 的 Elasticsearch 配置为你自己的：
+### 图表相关
 
-```yml
-spring:
-  elasticsearch:
-    uris: http://localhost:9200
-    username: root
-    password: 123456
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/chart/gen` | POST | 同步生成图表 |
+| `/api/chart/gen/async` | POST | 异步生成图表（线程池） |
+| `/api/chart/gen/async/mq` | POST | 异步生成图表（MQ） |
+| `/api/chart/my` | GET | 获取我的图表列表 |
+| `/api/chart/{id}` | GET | 获取图表详情 |
+| `/api/chart/add` | POST | 创建图表 |
+| `/api/chart/delete` | POST | 删除图表 |
+
+### 用户相关
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/user/register` | POST | 用户注册 |
+| `/api/user/login` | POST | 用户登录 |
+| `/api/user/logout` | POST | 用户注销 |
+| `/api/user/my` | GET | 获取当前用户信息 |
+
+### Prompt 模板相关
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/prompt/list` | GET | 获取模板列表 |
+| `/api/prompt/add` | POST | 添加模板 |
+| `/api/prompt/update` | POST | 更新模板 |
+| `/api/prompt/delete` | POST | 删除模板 |
+
+### 数据集相关
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/dataset/upload` | POST | 上传数据集 |
+| `/api/dataset/my` | GET | 获取我的数据集 |
+| `/api/dataset/{id}` | GET | 获取数据集详情 |
+
+## AI 响应格式
+
+AI 生成的内容需按照以下格式输出：
+
+```
+【【【【【
+{前端 Echarts V5 的 option 配置对象js代码，直接以{"title": {开头}
+【【【【【
+{明确的数据分析结论、越详细越好}
 ```
 
-2）复制 `sql/post_es_mapping.json` 文件中的内容，通过调用 Elasticsearch 的接口或者 Kibana Dev Tools 来创建索引（相当于数据库建表）
+## 项目结构
 
 ```
-PUT post_v1
-{
- 参数见 sql/post_es_mapping.json 文件
-}
+src/main/java/com/chartflow/core/
+├── annotation/          # 自定义注解
+├── aop/                 # AOP 切面
+├── bizmq/               # 业务消息队列（图表生成）
+├── common/              # 通用响应和工具类
+├── config/              # 配置类
+├── constant/            # 常量定义
+├── controller/          # REST API 控制器
+├── exception/           # 异常处理
+├── manager/             # 业务管理器（AI、存储等）
+├── mapper/              # MyBatis Mapper
+├── model/               # 数据模型（DTO、Entity、VO）
+├── mq/                  # MQ 示例代码
+├── service/             # 业务服务接口和实现
+├── utils/               # 工具类
+└── MainApplication.java # 启动类
 ```
 
-这步不会操作的话需要补充下 Elasticsearch 的知识，或者自行百度一下~
+## 配置说明
 
-3）开启同步任务，将数据库的帖子同步到 Elasticsearch
-
-找到 job 目录下的 `FullSyncPostToEs` 和 `IncSyncPostToEs` 文件，取消掉 `@Component` 注解的注释，再次执行程序即可触发同步：
-
-```java
-// todo 取消注释开启任务
-//@Component
+### Ollama 配置
+```yaml
+ollama:
+  base-url: http://localhost:11434/v1
+  model: qwen2.5:7b
 ```
 
-### 业务代码生成器
-
-支持自动生成 Service、Controller、数据模型代码，配合 MyBatisX 插件，可以快速开发增删改查等实用基础功能。
-
-找到 `generate.CodeGenerator` 类，修改生成参数和生成路径，并且支持注释掉不需要的生成逻辑，然后运行即可。
-
-```
-// 指定生成参数
-String packageName = "com.chartflow.core";
-String dataName = "用户评论";
-String dataKey = "userComment";
-String upperDataKey = "UserComment";
+### 邮件服务配置（环境变量）
+```yaml
+mcp:
+  email:
+    server-path: ./mcp_server/mcp_email_server.py
+    smtp-server: smtp.qq.com
+    smtp-port: 587
+    smtp-user: ${MCP_SMTP_USER:}
+    smtp-password: ${MCP_SMTP_PASSWORD:}
 ```
 
-生成代码后，可以移动到实际项目中，并且按照 `// todo` 注释的提示来针对自己的业务需求进行修改。
+## 注意事项
+
+1. 启动前请确保 Ollama 服务已运行
+2. 邮件服务需要配置正确的 SMTP 账号密码
+3. MQ 模式需要先启动 RabbitMQ 服务
+4. 上传的 Excel 文件大小限制为 50MB
+
+## License
+
+MIT License

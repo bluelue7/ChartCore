@@ -54,4 +54,13 @@ public interface ModelRecordService extends IService<ModelRecord> {
      */
     boolean updateModelRecordStatus(Long id, String status, String responseContent, String errorMessage, 
                                     Integer costMs, Integer inputTokens, Integer outputTokens, Integer totalTokens);
+
+    /**
+     * 更新模型调用记录关联的图表ID
+     *
+     * @param id      记录ID
+     * @param chartId 图表ID
+     * @return 是否成功
+     */
+    boolean updateChartId(Long id, Long chartId);
 }

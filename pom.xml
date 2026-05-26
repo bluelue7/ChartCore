@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>org.springframework.boot</groupId>
@@ -73,12 +73,12 @@
             <artifactId>spring-boot-starter-data-elasticsearch</artifactId>
         </dependency>
         <!-- https://mvnrepository.com/artifact/com.github.binarywang/wx-java-mp-spring-boot-starter -->
-<!--        <dependency>-->
-<!--            <groupId>com.github.binarywang</groupId>-->
-<!--            <artifactId>wx-java-mp-spring-boot-starter</artifactId>-->
-<!--            <version>4.4.0</version>-->
-<!--        </dependency>-->
-<!--        &lt;!&ndash; https://doc.xiaominfo.com/docs/quick-start#openapi2 &ndash;&gt;-->
+        <!--        <dependency>-->
+        <!--            <groupId>com.github.binarywang</groupId>-->
+        <!--            <artifactId>wx-java-mp-spring-boot-starter</artifactId>-->
+        <!--            <version>4.4.0</version>-->
+        <!--        </dependency>-->
+        <!--        &lt;!&ndash; https://doc.xiaominfo.com/docs/quick-start#openapi2 &ndash;&gt;-->
         <dependency>
             <groupId>com.github.xiaoymin</groupId>
             <artifactId>knife4j-openapi2-spring-boot-starter</artifactId>
@@ -138,6 +138,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <version>1.2.83</version>
         </dependency>
     </dependencies>
 

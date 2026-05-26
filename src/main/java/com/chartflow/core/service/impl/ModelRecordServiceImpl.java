@@ -82,4 +82,13 @@ public class ModelRecordServiceImpl extends ServiceImpl<ModelRecordMapper, Model
         modelRecord.setUpdateTime(new Date());
         return this.updateById(modelRecord);
     }
+
+    @Override
+    public boolean updateChartId(Long id, Long chartId) {
+        ModelRecord modelRecord = new ModelRecord();
+        modelRecord.setId(id);
+        modelRecord.setChartId(chartId);
+        modelRecord.setUpdateTime(new Date());
+        return this.updateById(modelRecord);
+    }
 }

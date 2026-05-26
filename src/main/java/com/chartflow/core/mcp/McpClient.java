@@ -1,13 +1,19 @@
 package com.chartflow.core.mcp;
 
+import com.chartflow.core.config.McpEmailConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * MCP 客户端
+ * 用于与 Python MCP 服务通信，发送邮件通知
+ */
 @Slf4j
 public class McpClient {
 
@@ -17,18 +23,27 @@ public class McpClient {
     private ObjectMapper objectMapper;
     private boolean initialized = false;
 
-     public McpClient(String serverPath, String smtpServer, String smtpPort, 
-                     String smtpUser, String smtpPassword)  throws IOException {
+    /**
+     * 使用配置类初始化 MCP 客户端
+     */
+    public McpClient(McpEmailConfig config) throws IOException {
         this.objectMapper = new ObjectMapper();
+        
+        // 检查配置是否完整
+        if (!config.isConfigured()) {
+            log.warn("MCP 邮件配置不完整，跳过初始化");
+            return;
+        }
+
         try {
-            ProcessBuilder pb = new ProcessBuilder("python", serverPath);
+            ProcessBuilder pb = new ProcessBuilder("python", config.getServerPath());
             
             // 设置 SMTP 环境变量
             Map<String, String> env = pb.environment();
-            env.put("SMTP_SERVER", smtpServer);
-            env.put("SMTP_PORT", smtpPort);
-            env.put("SMTP_USER", smtpUser);
-            env.put("SMTP_PASSWORD", smtpPassword);
+            env.put("SMTP_SERVER", config.getSmtpServer());
+            env.put("SMTP_PORT", config.getSmtpPort());
+            env.put("SMTP_USER", config.getSmtpUser());
+            env.put("SMTP_PASSWORD", config.getSmtpPassword());
             
             pb.redirectErrorStream(false);
             this.process = pb.start();
@@ -88,7 +103,7 @@ public class McpClient {
 
     private JsonNode sendRequest(Map<String, Object> request) throws IOException {
         String jsonRequest = objectMapper.writeValueAsString(request);
-        log.info("发送 MCP 请求: {}", jsonRequest);
+        log.debug("发送 MCP 请求: {}", jsonRequest);
 
         writer.write(jsonRequest);
         writer.newLine();
@@ -99,15 +114,30 @@ public class McpClient {
             throw new IOException("MCP 服务器连接中断");
         }
 
-        log.info("收到 MCP 响应: {}", responseLine);
+        log.debug("收到 MCP 响应: {}", responseLine);
         return objectMapper.readTree(responseLine);
     }
 
+    /**
+     * 发送邮件
+     *
+     * @param toEmail     收件人邮箱
+     * @param subject     邮件主题
+     * @param htmlContent HTML 内容
+     * @return 是否发送成功
+     */
     public boolean sendEmail(String toEmail, String subject, String htmlContent) {
         if (!initialized) {
             log.warn("MCP 客户端未初始化");
             return false;
         }
+        
+        // 参数校验
+        if (StringUtils.isBlank(toEmail) || StringUtils.isBlank(subject)) {
+            log.warn("邮件参数不完整: toEmail={}, subject={}", toEmail, subject);
+            return false;
+        }
+        
         try {
             Map<String, Object> request = new HashMap<>();
             request.put("type", "tool_call");

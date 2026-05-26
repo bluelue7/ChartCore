@@ -1,5 +1,6 @@
 package com.chartflow.core.service.impl;
 
+import com.chartflow.core.config.ChartConfig;
 import com.chartflow.core.common.ErrorCode;
 import com.chartflow.core.exception.BusinessException;
 import com.chartflow.core.model.dto.chart.OllamaChatRequest;
@@ -14,9 +15,14 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.Arrays;
 
+/**
+ * 本地 AI 服务实现
+ * 对接 Ollama 本地大模型服务
+ */
 @Slf4j
 @Service
 public class LocalAiServiceImpl implements LocalAiService {
+
     @Value("${ollama.base-url:http://localhost:11434/v1}")
     private String baseUrl;
 
@@ -24,9 +30,11 @@ public class LocalAiServiceImpl implements LocalAiService {
     private String model;
 
     private final RestTemplate restTemplate;
+    private final ChartConfig chartConfig;
 
-    public LocalAiServiceImpl(RestTemplate restTemplate) {
+    public LocalAiServiceImpl(RestTemplate restTemplate, ChartConfig chartConfig) {
         this.restTemplate = restTemplate;
+        this.chartConfig = chartConfig;
     }
 
     @Override
@@ -102,7 +110,7 @@ public class LocalAiServiceImpl implements LocalAiService {
 
     @Override
     public AiResponse doChartChatWithInfo(String goal, String csvData) {
-        // 构建专门的图表生成提示词
+        // 使用配置类中的默认 prompt
         String prompt = buildChartPrompt(goal, csvData);
         return doChatWithInfo(prompt);
     }
@@ -111,14 +119,13 @@ public class LocalAiServiceImpl implements LocalAiService {
      * 构建图表生成的提示词
      */
     private String buildChartPrompt(String goal, String csvData) {
-        return "你是一个专业的数据分析师和前端开发专家。请根据以下分析需求和原始数据，生成图表配置和分析结论。\n\n" +
-                "分析需求：\n" + goal + "\n\n" +
-                "原始数据：\n" + csvData + "\n\n" +
-                "请严格按照以下格式生成内容（不要输出任何其他文字）：\n" +
-                "【【【【【\n" +
-                "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释，直接以{\n\"title\": {开头}\n" +
-                "【【【【【\n" +
-                "{这里输出详细的数据分析结论}";
+        // 使用配置类中的默认模板
+        String defaultPrompt = chartConfig.getDefaultPrompt();
+        
+        // 如果配置中的模板已经包含占位符，替换占位符
+        return defaultPrompt
+                .replace("{数据分析的需求或者目标}", goal)
+                .replace("{csv格式的原始数据，用,作为分隔符}", csvData);
     }
 
     @Override
@@ -135,10 +142,10 @@ public class LocalAiServiceImpl implements LocalAiService {
                     "分析需求：\n" + goal + "\n" +
                     "原始数据：\n" + csvData;
         } else {
-            // 使用默认模板
+            // 使用配置类中的默认模板
             prompt = buildChartPrompt(goal, csvData);
         }
-        //log.info("receiveMessage prompt = {}", prompt);
+        log.debug("构建的图表生成提示词长度: {}", prompt.length());
         return doChatWithInfo(prompt);
     }
 }
