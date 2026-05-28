@@ -2,8 +2,6 @@ package com.chartflow.core.service.impl;
 
 import com.chartflow.core.bizmq.BiMessageProducer;
 import com.chartflow.core.config.ChartConfig;
-import com.chartflow.core.constant.UserConstant;
-import com.chartflow.core.exception.BusinessException;
 import com.chartflow.core.exception.ThrowUtils;
 import com.chartflow.core.manager.AiManager;
 import com.chartflow.core.manager.RedisLimiterManager;
@@ -11,7 +9,6 @@ import com.chartflow.core.model.dto.chart.GenChartByAiRequest;
 import com.chartflow.core.model.dto.modelrecord.ModelRecordAddRequest;
 import com.chartflow.core.model.dto.tasklog.TaskLogAddRequest;
 import com.chartflow.core.model.entity.Chart;
-import com.chartflow.core.model.entity.ModelRecord;
 import com.chartflow.core.model.entity.Prompt;
 import com.chartflow.core.model.entity.User;
 import com.chartflow.core.model.vo.AiResponse;
@@ -26,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -47,7 +45,7 @@ public class ChartGenServiceImpl implements ChartGenService {
     /**
      * 允许的文件后缀
      */
-    private static final List<String> VALID_FILE_SUFFIX_LIST = List.of("xlsx", "xls");
+    private static final List<String> VALID_FILE_SUFFIX_LIST = Arrays.asList("xlsx", "xls");
 
     /**
      * 最大重试次数
@@ -95,7 +93,7 @@ public class ChartGenServiceImpl implements ChartGenService {
         redisLimiterManager.doRateLimit("genChartByAi_" + user.getId());
 
         // 获取 Prompt
-        String promptQuery = getPrompt(request.getPromptId());
+        String promptQuery = getPrompt(request.getPromptId(),true);
 
         // 解析 Excel 数据
         String csvData = ExcelUtils.excelToCsv(file);
@@ -104,7 +102,7 @@ public class ChartGenServiceImpl implements ChartGenService {
         String userGoal = buildUserGoal(request.getGoal(), request.getChartType());
 
         // 构建完整请求内容
-        String fullRequestContent = buildFullRequestContent(promptQuery, userGoal, csvData, request.getPromptId());
+        String fullRequestContent = buildFullRequestContent(promptQuery, userGoal, csvData);
 
         long startTime = System.currentTimeMillis();
         Long modelRecordId = null;
@@ -210,7 +208,7 @@ public class ChartGenServiceImpl implements ChartGenService {
         redisLimiterManager.doRateLimit("genChartByAi_" + user.getId());
 
         // 获取 Prompt
-        String promptQuery = getPrompt(request.getPromptId());
+        String promptQuery = getPrompt(request.getPromptId(), true);
 
         // 解析 Excel 数据
         String csvData = ExcelUtils.excelToCsv(file);
@@ -219,7 +217,7 @@ public class ChartGenServiceImpl implements ChartGenService {
         String userGoal = buildUserGoal(request.getGoal(), request.getChartType());
 
         // 构建完整请求内容
-        String fullRequestContent = buildFullRequestContent(promptQuery, userGoal, csvData, request.getPromptId());
+        String fullRequestContent = buildFullRequestContent(promptQuery, userGoal, csvData);
 
         // 保存图表（running 状态）
         Chart chart = saveChart(request.getName(), request.getGoal(), csvData, 
@@ -329,7 +327,7 @@ public class ChartGenServiceImpl implements ChartGenService {
         redisLimiterManager.doRateLimit("genChartByAi_" + user.getId());
 
         // 获取 Prompt
-        String promptQuery = getPrompt(request.getPromptId());
+        String promptQuery = getPrompt(request.getPromptId(), true);
 
         // 解析 Excel 数据
         String csvData = ExcelUtils.excelToCsv(file);
@@ -338,7 +336,7 @@ public class ChartGenServiceImpl implements ChartGenService {
         String userGoal = buildUserGoal(request.getGoal(), request.getChartType());
 
         // 构建完整请求内容
-        String fullRequestContent = buildFullRequestContent(promptQuery, userGoal, csvData, request.getPromptId());
+        String fullRequestContent = buildFullRequestContent(promptQuery, userGoal, csvData);
 
         // 保存图表（running 状态）
         Chart chart = saveChart(request.getName(), request.getGoal(), csvData, 
@@ -372,14 +370,7 @@ public class ChartGenServiceImpl implements ChartGenService {
         }
 
         // 2. 获取 Prompt
-        String promptQuery = null;
-        if (promptId != null && promptId > 0) {
-            Prompt prompt = promptService.getById(promptId);
-            if (prompt != null) {
-                promptQuery = prompt.getPromptQuery();
-                promptService.incrementUsageCount(promptId);
-            }
-        }
+        String promptQuery = getPrompt(promptId, false);
 
         // 3. 带重试机制调用AI生成
         AiResponse aiResponse = generateWithRetry(chart.getGoal(), chart.getChartData(), promptQuery);
@@ -573,17 +564,23 @@ public class ChartGenServiceImpl implements ChartGenService {
 
     /**
      * 获取 Prompt（优先使用自定义，否则使用默认）
+     * @param promptId 自定义Prompt ID，为null或0时使用默认Prompt
+     * @param incrementUsage 是否增加使用次数（建议只在消费成功时传true）
      */
-    private String getPrompt(Long promptId) {
+    private String getPrompt(Long promptId, boolean incrementUsage) {
         if (promptId != null && promptId > 0) {
             Prompt prompt = promptService.getById(promptId);
             if (prompt != null) {
-                promptService.incrementUsageCount(promptId);
+                // 只在消费成功时增加使用次数，避免重复统计
+                if (incrementUsage) {
+                    promptService.incrementUsageCount(promptId);
+                }
                 return prompt.getPromptQuery();
             }
         }
         return chartConfig.getDefaultPrompt();
     }
+
 
     /**
      * 构建用户目标（包含图表类型）
@@ -599,18 +596,8 @@ public class ChartGenServiceImpl implements ChartGenService {
     /**
      * 构建完整的请求内容
      */
-    private String buildFullRequestContent(String promptQuery, String userGoal, String csvData, Long promptId) {
-        if (promptId != null && promptId > 0) {
-            // 使用自定义 prompt
-            return promptQuery + "\n====================\n" +
-                    "分析需求：\n" + userGoal + "\n" +
-                    "原始数据：\n" + csvData;
-        } else {
-            // 使用默认 prompt
-            return promptQuery + "\n" +
-                    "分析需求：\n" + userGoal + "\n" +
-                    "原始数据：\n" + csvData;
-        }
+    private String buildFullRequestContent(String promptQuery, String userGoal, String csvData) {
+        return String.format(promptQuery, userGoal, csvData);
     }
 
     /**

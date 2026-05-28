@@ -1,11 +1,11 @@
 package com.chartflow.core.model.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableLogic;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import java.util.Date;
 import lombok.Data;
+import java.io.Serializable;
 
 /**
  * 图表信息表
@@ -13,11 +13,12 @@ import lombok.Data;
  */
 @TableName(value ="chart")
 @Data
-public class Chart {
+public class Chart implements Serializable{
     /**
      * id
      */
     @TableId(type = IdType.ASSIGN_ID)
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
 
     /**
@@ -80,4 +81,7 @@ public class Chart {
      */
     @TableLogic
     private Integer isDelete;
+
+    @TableField(exist = false)
+    private static final long serialVersionUID = 1L;
 }

@@ -90,6 +90,7 @@ public class LocalAiServiceImpl implements LocalAiService {
 
                 String content = response.getBody().getChoices().get(0).getMessage().getContent();
                 log.info("本地AI返回成功，内容长度: {}", content.length());
+                log.info("本地AI返回内容: {}",content);
 
                 // 提取Token信息
                 OllamaChatResponse.Usage usage = response.getBody().getUsage();
@@ -121,11 +122,7 @@ public class LocalAiServiceImpl implements LocalAiService {
     private String buildChartPrompt(String goal, String csvData) {
         // 使用配置类中的默认模板
         String defaultPrompt = chartConfig.getDefaultPrompt();
-        
-        // 如果配置中的模板已经包含占位符，替换占位符
-        return defaultPrompt
-                .replace("{数据分析的需求或者目标}", goal)
-                .replace("{csv格式的原始数据，用,作为分隔符}", csvData);
+        return String.format(defaultPrompt, goal, csvData);
     }
 
     @Override
@@ -138,9 +135,7 @@ public class LocalAiServiceImpl implements LocalAiService {
         String prompt;
         if (customPrompt != null && !customPrompt.isEmpty()) {
             // 使用自定义prompt，拼接分析目标和数据
-            prompt = customPrompt + "\n====================\n" +
-                    "分析需求：\n" + goal + "\n" +
-                    "原始数据：\n" + csvData;
+            prompt = String.format(customPrompt, goal, csvData);
         } else {
             // 使用配置类中的默认模板
             prompt = buildChartPrompt(goal, csvData);

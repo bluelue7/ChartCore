@@ -12,6 +12,12 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 */
 public interface ChartService extends IService<Chart> {
 
+    Chart getById(long id);
+
+    boolean updateById(Chart entity);
+
+    boolean removeById(long id);
+
     /**
      * 获取查询条件封装
      *

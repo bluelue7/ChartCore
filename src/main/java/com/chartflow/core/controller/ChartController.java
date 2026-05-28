@@ -13,6 +13,7 @@ import com.chartflow.core.exception.BusinessException;
 import com.chartflow.core.exception.ThrowUtils;
 import com.chartflow.core.model.dto.chart.ChartAddRequest;
 import com.chartflow.core.model.dto.chart.ChartQueryRequest;
+import com.chartflow.core.model.dto.chart.ChartUpdateRequest;
 import com.chartflow.core.model.dto.chart.GenChartByAiRequest;
 import com.chartflow.core.model.entity.Chart;
 import com.chartflow.core.model.entity.User;
@@ -52,8 +53,6 @@ public class ChartController {
 
     @Resource
     private EmailService emailService;
-
-    // region 增删改查
 
     /**
      * 创建图表
@@ -97,7 +96,7 @@ public class ChartController {
      */
     @PostMapping("/update")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Boolean> updateChart(@RequestBody com.chartflow.core.model.dto.chart.ChartUpdateRequest chartUpdateRequest,
+    public BaseResponse<Boolean> updateChart(@RequestBody ChartUpdateRequest chartUpdateRequest,
             HttpServletRequest request) {
         if (chartUpdateRequest == null || chartUpdateRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
