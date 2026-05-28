@@ -25,8 +25,13 @@ public class ThreadPoolExecutorConfig {
                 return thread;
             }
         };
-        ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(2, 4, 100, TimeUnit.SECONDS,
-                new ArrayBlockingQueue<>(4), threadFactory);
+        ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(
+                4,  // 核心线程数
+                8,  // 最大线程数
+                60, // 空闲线程存活时间（秒）
+                TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(16), // 队列容量
+                threadFactory);
         return threadPoolExecutor;
     }
 }

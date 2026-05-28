@@ -23,7 +23,7 @@ public class ChartGenResult {
     private String genResult;
     
     /**
-     * 处理状态：success / partial / failed
+     * 处理状态：succeed / partial / failed
      */
     private String status;
     
@@ -48,7 +48,7 @@ public class ChartGenResult {
         ChartGenResult result = new ChartGenResult();
         result.setGenChart(genChart);
         result.setGenResult(genResult);
-        result.setStatus("success");
+        result.setStatus("succeed");
         if (aiResponse != null) {
             result.setInputTokens(aiResponse.getInputTokens());
             result.setOutputTokens(aiResponse.getOutputTokens());

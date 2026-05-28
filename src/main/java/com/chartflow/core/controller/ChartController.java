@@ -158,7 +158,6 @@ public class ChartController {
         return ResultUtils.success(chartPage);
     }
 
-    // endregion
 
     /**
      * 智能分析（同步）

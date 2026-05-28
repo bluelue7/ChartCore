@@ -139,8 +139,10 @@ public class BiMessageConsumer {
 
         try {
             // 调用服务层处理（包含重试、容错逻辑）
+            // 注意：此调用会执行AI生成，耗时较长，不需要保持数据库连接
             ChartGenResult result = chartGenService.processChartGenTask(chartId, promptId);
             
+            // AI生成完成后，再批量更新数据库
             // 更新图表结果
             Chart updateChart = new Chart();
             updateChart.setId(chartId);
@@ -153,11 +155,12 @@ public class BiMessageConsumer {
             int costMs = (int) (System.currentTimeMillis() - startTime);
             updateTaskRecords(taskLog, modelRecord, result, costMs);
             
-            // 发送邮件通知
+            // 先确认消息，避免邮件失败导致重复消费
+            safeAck(channel, deliveryTag);
+            
+            // 发送邮件通知（异步，不阻塞）
             sendEmailNotificationAsync(chartId);
             
-            // 确认消息
-            safeAck(channel, deliveryTag);
             log.info("图表生成任务处理完成: chartId={}, status={}, 耗时={}ms", chartId, result.getStatus(), costMs);
 
         } catch (Exception e) {

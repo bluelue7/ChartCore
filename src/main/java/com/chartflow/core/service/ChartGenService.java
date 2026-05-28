@@ -58,11 +58,12 @@ public interface ChartGenService {
      * 当解析失败时自动重试，最多重试2次
      *
      * @param goal       分析目标
+     * @param chartType  图表类型
      * @param csvData    CSV数据
      * @param promptQuery 提示词（可为null）
      * @return AI响应，如果重试后仍失败返回null
      */
-    AiResponse generateWithRetry(String goal, String csvData, String promptQuery);
+    AiResponse generateWithRetry(String goal, String chartType, String csvData, String promptQuery);
 
     /**
      * 获取默认图表配置（当AI生成失败时使用）

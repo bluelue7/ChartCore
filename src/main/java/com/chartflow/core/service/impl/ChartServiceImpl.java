@@ -37,19 +37,19 @@ public class ChartServiceImpl extends ServiceImpl<ChartMapper, Chart>
     @Override
     public Chart getById(long id) {
         // 先从缓存获取
-        Chart cachedChart = redisCacheManager.getCachedChart(id);
-        if (cachedChart != null) {
-            log.debug("从缓存获取图表: chartId={}", id);
-            return cachedChart;
-        }
+//        Chart cachedChart = redisCacheManager.getCachedChart(id);
+//        if (cachedChart != null) {
+//            log.debug("从缓存获取图表: chartId={}", id);
+//            return cachedChart;
+//        }
 
         // 缓存不存在，从数据库获取
         Chart chart = super.getById(id);
-        if (chart != null) {
-            // 更新缓存
-            redisCacheManager.cacheChart(chart);
-            log.debug("从数据库获取并缓存图表: chartId={}", id);
-        }
+//        if (chart != null) {
+//            // 更新缓存
+//            redisCacheManager.cacheChart(chart);
+//            log.debug("从数据库获取并缓存图表: chartId={}", id);
+//        }
         return chart;
     }
 
@@ -59,11 +59,11 @@ public class ChartServiceImpl extends ServiceImpl<ChartMapper, Chart>
     @Override
     public boolean updateById(Chart entity) {
         boolean result = super.updateById(entity);
-        if (result && entity != null && entity.getId() != null) {
-            // 更新缓存
-            redisCacheManager.cacheChart(entity);
-            log.debug("更新图表并同步缓存: chartId={}", entity.getId());
-        }
+//        if (result && entity != null && entity.getId() != null) {
+//            // 更新缓存
+//            redisCacheManager.cacheChart(entity);
+//            log.debug("更新图表并同步缓存: chartId={}", entity.getId());
+//        }
         return result;
     }
 
@@ -73,8 +73,8 @@ public class ChartServiceImpl extends ServiceImpl<ChartMapper, Chart>
     @Override
     public boolean removeById(long id) {
         // 先删除缓存
-        redisCacheManager.removeChartCache(id);
-        log.debug("删除图表前先删除缓存: chartId={}", id);
+//        redisCacheManager.removeChartCache(id);
+//        log.debug("删除图表前先删除缓存: chartId={}", id);
         
         return super.removeById(id);
     }

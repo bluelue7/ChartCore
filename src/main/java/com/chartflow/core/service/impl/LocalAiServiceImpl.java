@@ -43,8 +43,8 @@ public class LocalAiServiceImpl implements LocalAiService {
     }
 
     @Override
-    public String doChartChat(String goal, String csvData) {
-        return doChartChatWithInfo(goal, csvData).getContent();
+    public String doChartChat(String goal, String chartType, String csvData) {
+        return doChartChatWithInfo(goal, chartType, csvData).getContent();
     }
 
     @Override
@@ -110,35 +110,35 @@ public class LocalAiServiceImpl implements LocalAiService {
     }
 
     @Override
-    public AiResponse doChartChatWithInfo(String goal, String csvData) {
+    public AiResponse doChartChatWithInfo(String goal, String chartType, String csvData) {
         // 使用配置类中的默认 prompt
-        String prompt = buildChartPrompt(goal, csvData);
+        String prompt = buildChartPrompt(goal, chartType, csvData);
         return doChatWithInfo(prompt);
     }
 
     /**
      * 构建图表生成的提示词
      */
-    private String buildChartPrompt(String goal, String csvData) {
+    private String buildChartPrompt(String goal, String chartType, String csvData) {
         // 使用配置类中的默认模板
         String defaultPrompt = chartConfig.getDefaultPrompt();
-        return String.format(defaultPrompt, goal, csvData);
+        return String.format(defaultPrompt, goal, chartType, csvData);
     }
 
     @Override
-    public String doChartChat(String goal, String csvData, String customPrompt) {
-        return doChartChatWithInfo(goal, csvData, customPrompt).getContent();
+    public String doChartChat(String goal, String chartType, String csvData, String customPrompt) {
+        return doChartChatWithInfo(goal, chartType, csvData, customPrompt).getContent();
     }
 
     @Override
-    public AiResponse doChartChatWithInfo(String goal, String csvData, String customPrompt) {
+    public AiResponse doChartChatWithInfo(String goal, String chartType, String csvData, String customPrompt) {
         String prompt;
         if (customPrompt != null && !customPrompt.isEmpty()) {
             // 使用自定义prompt，拼接分析目标和数据
-            prompt = String.format(customPrompt, goal, csvData);
+            prompt = String.format(customPrompt, goal, chartType, csvData);
         } else {
             // 使用配置类中的默认模板
-            prompt = buildChartPrompt(goal, csvData);
+            prompt = buildChartPrompt(goal, chartType, csvData);
         }
         log.debug("构建的图表生成提示词长度: {}", prompt.length());
         return doChatWithInfo(prompt);

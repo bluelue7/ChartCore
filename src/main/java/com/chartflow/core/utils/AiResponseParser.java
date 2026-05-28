@@ -3,6 +3,8 @@ package com.chartflow.core.utils;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.chartflow.core.model.entity.SeriesData; 
+import com.chartflow.core.model.entity.AIResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
@@ -267,30 +269,30 @@ public class AiResponseParser {
         if (!isValidChartConfig(config)) {
             return false;
         }
-        
+
         try {
             JSONObject json = JSON.parseObject(config);
-            
+
             // 检查series是否存在且非空
             if (!json.containsKey("series")) {
                 log.warn("图表配置缺少series字段");
                 return false;
             }
-            
+
             // 检查series是否为数组
             Object series = json.get("series");
             if (!(series instanceof java.util.List)) {
                 log.warn("series字段不是数组格式");
                 return false;
             }
-            
+
             @SuppressWarnings("unchecked")
             java.util.List<JSONObject> seriesList = (java.util.List<JSONObject>) series;
             if (seriesList.isEmpty()) {
                 log.warn("series数组为空");
                 return false;
             }
-            
+
             // 检查每个series是否有必需字段
             for (JSONObject s : seriesList) {
                 if (!s.containsKey("type")) {
@@ -302,12 +304,191 @@ public class AiResponseParser {
                     return false;
                 }
             }
-            
+
             return true;
-            
+
         } catch (Exception e) {
             log.error("图表配置校验失败: {}", e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * 解析 AI 结构化响应（AIResult 格式）
+     * 用于新架构：AI 返回结构化 JSON，后端生成 ECharts 配置
+     * @param content AI 返回的原始内容
+     * @return AIResult 对象，解析失败返回 null
+     */
+    public static AIResult parseAIResult(String content) {
+        if (StringUtils.isBlank(content)) {
+            log.warn("AI响应内容为空");
+            return null;
+        }
+
+        try {
+            // 策略1：按分隔符提取 JSON
+            AIResult result = extractAIResultByDelimiter(content);
+            if (result != null && isValidAIResult(result)) {
+                log.debug("使用分隔符解析AIResult成功");
+                return result;
+            }
+
+            // 策略2：直接解析整个内容为 JSON
+            result = parseDirectly(content);
+            if (result != null && isValidAIResult(result)) {
+                log.debug("直接解析AIResult成功");
+                return result;
+            }
+
+            // 策略3：提取第一个完整的 JSON 对象
+            result = extractFirstJsonAsAIResult(content);
+            if (result != null && isValidAIResult(result)) {
+                log.debug("提取JSON对象解析AIResult成功");
+                return result;
+            }
+
+            log.warn("所有解析策略均失败，原始内容长度: {}", content.length());
+            return null;
+
+        } catch (Exception e) {
+            log.error("解析AIResult失败: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 按分隔符提取 AIResult JSON
+     */
+    private static AIResult extractAIResultByDelimiter(String content) {
+        String[] splits = content.split(java.util.regex.Pattern.quote(DEFAULT_DELIMITER));
+        if (splits.length >= 2) {
+            String jsonStr = splits[1].trim();
+            jsonStr = cleanCodeBlock(jsonStr);
+            return parseAsAIResult(jsonStr);
+        }
+        return null;
+    }
+
+    /**
+     * 直接解析字符串为 AIResult
+     */
+    private static AIResult parseDirectly(String content) {
+        String cleaned = cleanCodeBlock(content.trim());
+        return parseAsAIResult(cleaned);
+    }
+
+    /**
+     * 提取第一个完整 JSON 对象作为 AIResult
+     */
+    private static AIResult extractFirstJsonAsAIResult(String content) {
+        int braceCount = 0;
+        int startIndex = -1;
+
+        for (int i = 0; i < content.length(); i++) {
+            char c = content.charAt(i);
+
+            if (c == '{') {
+                if (braceCount == 0) {
+                    startIndex = i;
+                }
+                braceCount++;
+            } else if (c == '}') {
+                braceCount--;
+                if (braceCount == 0 && startIndex != -1) {
+                    String jsonStr = content.substring(startIndex, i + 1);
+                    return parseAsAIResult(jsonStr);
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 将 JSON 字符串解析为 AIResult
+     */
+    private static AIResult parseAsAIResult(String jsonStr) {
+        if (StringUtils.isBlank(jsonStr) || !jsonStr.startsWith("{")) {
+            return null;
+        }
+
+        try {
+            AIResult result = JSON.parseObject(jsonStr, AIResult.class);
+
+            // 验证必要字段
+            if (result == null) {
+                return null;
+            }
+
+            // 检查 chartType 是否有有效值
+            if (StringUtils.isBlank(result.getChartType())) {
+                log.warn("AIResult 缺少 chartType 字段");
+                return null;
+            }
+
+            // 检查 categories 是否有数据
+            if (result.getCategories() == null || result.getCategories().isEmpty()) {
+                log.warn("AIResult categories 为空");
+                return null;
+            }
+
+            // 检查 series 是否有数据
+            if (result.getSeries() == null || result.getSeries().isEmpty()) {
+                log.warn("AIResult series 为空");
+                return null;
+            }
+
+            return result;
+
+        } catch (Exception e) {
+            log.debug("JSON 解析为 AIResult 失败: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 验证 AIResult 是否有效
+     */
+    private static boolean isValidAIResult(AIResult result) {
+        if (result == null) {
+            return false;
+        }
+
+        if (StringUtils.isBlank(result.getChartType())) {
+            log.warn("AIResult.chartType 为空");
+            return false;
+        }
+
+        if (result.getCategories() == null || result.getCategories().isEmpty()) {
+            log.warn("AIResult.categories 为空");
+            return false;
+        }
+
+        if (result.getSeries() == null || result.getSeries().isEmpty()) {
+            log.warn("AIResult.series 为空");
+            return false;
+        }
+
+        // 验证每个 series 都有 data（兼容 SeriesData 或 JSONObject）
+        for (Object s : result.getSeries()) {
+            boolean hasData = false;
+            if (s instanceof SeriesData) {
+                hasData = ((SeriesData) s).getData() != null;
+            } else if (s instanceof JSONObject) {
+                hasData = ((JSONObject) s).containsKey("data");
+            } else {
+                // 尝试反射检查
+                try {
+                    Object data = s.getClass().getMethod("getData").invoke(s);
+                    hasData = data != null;
+                } catch (Exception ignored) {
+                    hasData = false;
+                }
+            }
+            if (!hasData) {
+                log.warn("AIResult.series 缺少 data 字段");
+                return false;
+            }
+        }
+        return true;
     }
 }
