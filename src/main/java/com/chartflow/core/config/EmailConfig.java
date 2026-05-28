@@ -15,6 +15,6 @@ public class EmailConfig {
     @PostConstruct
     public void init() {
         // 设置 EmailContentBuilder 的 ChartImageService
-        EmailContentBuilder.setChartImageService(chartImageService);
+//        EmailContentBuilder.setChartImageService(chartImageService);
     }
 }
