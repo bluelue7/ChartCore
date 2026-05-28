@@ -17,6 +17,11 @@ public class ChartQueryRequest extends PageRequest implements Serializable {
     private Long id;
 
     /**
+     * 关键词
+     */
+    private String keyword;
+
+    /**
      * 名称
      */
     private String name;
@@ -30,6 +35,11 @@ public class ChartQueryRequest extends PageRequest implements Serializable {
      * 图表类型
      */
     private String chartType;
+
+    /**
+     * 状态
+     */
+    private String status;
 
     /**
      * 用户 id

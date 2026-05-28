@@ -86,15 +86,19 @@ public class ChartServiceImpl extends ServiceImpl<ChartMapper, Chart>
             return queryWrapper;
         }
         Long id = chartQueryRequest.getId();
+        String keyword = chartQueryRequest.getKeyword();
         String name = chartQueryRequest.getName();
         String goal = chartQueryRequest.getGoal();
         String chartType = chartQueryRequest.getChartType();
         Long userId = chartQueryRequest.getUserId();
+        String status = chartQueryRequest.getStatus();
 
         // 拼接查询条件
         queryWrapper.eq(id != null && id > 0, "id", id);
         queryWrapper.eq(StringUtils.isNotBlank(chartType), "chartType", chartType);
         queryWrapper.eq(userId != null && userId > 0, "userId", userId);
+        queryWrapper.eq(StringUtils.isNotBlank(status), "status", status);
+        queryWrapper.like(StringUtils.isNotBlank(keyword), "goal", keyword);
         queryWrapper.like(StringUtils.isNotBlank(name), "name", name);
         queryWrapper.like(StringUtils.isNotBlank(goal), "goal", goal);
         queryWrapper.orderByDesc("createTime");
