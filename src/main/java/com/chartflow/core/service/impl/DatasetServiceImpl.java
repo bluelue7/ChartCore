@@ -141,8 +141,8 @@ public class DatasetServiceImpl extends ServiceImpl<DatasetMapper, Dataset>
         }
 
         String suffix = FileUtil.getSuffix(originalFilename).toLowerCase();
-        if (!"csv".equals(suffix) && !"xlsx".equals(suffix) && !"xls".equals(suffix)) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "只支持CSV、XLSX、XLS格式的文件");
+        if (!"xlsx".equals(suffix) && !"xls".equals(suffix)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "只支持XLSX、XLS格式的文件");
         }
 
         // 文件大小限制 10MB
@@ -164,9 +164,7 @@ public class DatasetServiceImpl extends ServiceImpl<DatasetMapper, Dataset>
         String suffix = FileUtil.getSuffix(file.getName()).toLowerCase();
         
         try {
-            if ("csv".equals(suffix)) {
-                parseCsvFile(file, metaInfo);
-            } else if ("xlsx".equals(suffix) || "xls".equals(suffix)) {
+           if ("xlsx".equals(suffix) || "xls".equals(suffix)) {
                 parseExcelFile(file, metaInfo);
             }
         } catch (Exception e) {
@@ -176,36 +174,6 @@ public class DatasetServiceImpl extends ServiceImpl<DatasetMapper, Dataset>
         return metaInfo;
     }
 
-    /**
-     * 解析CSV文件
-     */
-    private void parseCsvFile(File file, FileMetaInfo metaInfo) {
-        List<String> lines = FileUtil.readLines(file, "UTF-8");
-        if (lines.isEmpty()) {
-            return;
-        }
-
-        // 获取列数（第一行）
-        String headerLine = lines.get(0);
-        String[] headers = headerLine.split(",");
-        metaInfo.columnCount = headers.length;
-
-        // 收集字段名
-        List<String> columnNames = new ArrayList<>();
-        for (String header : headers) {
-            columnNames.add(header.trim());
-        }
-
-        // 设置字段元信息
-        try {
-            metaInfo.columnMeta = objectMapper.writeValueAsString(columnNames);
-        } catch (JsonProcessingException e) {
-            log.warn("序列化字段元信息失败", e);
-        }
-
-        // 行数 = 总行数 - 1（减去表头）
-        metaInfo.rowCount = lines.size() - 1;
-    }
 
     /**
      * 解析Excel文件

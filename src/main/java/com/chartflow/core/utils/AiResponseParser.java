@@ -8,6 +8,9 @@ import com.chartflow.core.model.entity.AIResult;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -457,11 +460,27 @@ public class AiResponseParser {
             log.warn("AIResult.chartType 为空");
             return false;
         }
+        String chartType = result.getChartType();
+        Set<String> typesNeedCategories = new HashSet<>(Arrays.asList("bar", "line", "pie"));
 
-        if (result.getCategories() == null || result.getCategories().isEmpty()) {
-            log.warn("AIResult.categories 为空");
-            return false;
+        // bar/line/pie 必须 categories 非空
+        if (typesNeedCategories.contains(chartType)) {
+            if (result.getCategories() == null || result.getCategories().isEmpty()) {
+                log.warn("图表类型 {} 要求 categories 非空", chartType);
+                return false;
+            }
         }
+
+        // 雷达图两种方式二选一（这里采用提示词描述：categories 作为维度名称，radarIndicator 可选）
+        if ("radar".equals(chartType)) {
+            if (result.getCategories() == null || result.getCategories().isEmpty()) {
+                log.warn("雷达图要求 categories 非空作为维度名称");
+                return false;
+            }
+            // radarIndicator 不强制，可以自动生成
+        }
+
+        // scatter 不要求 categories，也不需要额外检查
 
         if (result.getSeries() == null || result.getSeries().isEmpty()) {
             log.warn("AIResult.series 为空");

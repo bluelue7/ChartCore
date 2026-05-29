@@ -153,6 +153,7 @@ public class ChartFactory {
 
     /**
      * 生成散点图配置
+     * 数据格式校验：series[].data 必须是 [[x1,y1], [x2,y2], ...] 格式
      */
     private static JSONObject buildScatterChart(AIResult result) {
         JSONObject option = new JSONObject();
@@ -180,8 +181,9 @@ public class ChartFactory {
         yAxis.put("axisLine", createAxisLine());
         option.put("yAxis", yAxis);
 
-        option.put("series", createSeriesList(result.getSeries(), "scatter"));
-
+        // 校验并转换散点图数据
+        JSONArray validatedSeries = validateAndConvertScatterData(result.getSeries());
+        option.put("series", validatedSeries);
         option.put("grid", createGrid());
 
         return option;
@@ -189,6 +191,7 @@ public class ChartFactory {
 
     /**
      * 生成雷达图配置
+     * 优先使用 AIResult.radarIndicator，为空时根据 categories 自动生成
      */
     private static JSONObject buildRadarChart(AIResult result) {
         JSONObject option = new JSONObject();
@@ -203,8 +206,22 @@ public class ChartFactory {
         option.put("tooltip", createTooltip());
 
         JSONObject radar = new JSONObject();
+        // 优先使用 AIResult.radarIndicator
+        List<AIResult.RadarIndicator> radarIndicators = result.getRadarIndicator();
         List<String> categories = result.getCategories();
-        if (categories != null) {
+        if (radarIndicators != null && !radarIndicators.isEmpty()) {
+            // 使用 AI 提供的 radarIndicator
+            JSONArray indicator = new JSONArray();
+            for (AIResult.RadarIndicator ri : radarIndicators) {
+                JSONObject ind = new JSONObject();
+                ind.put("name", ri.getName());
+                ind.put("max", ri.getMax() != null ? ri.getMax() : 100);
+                ind.put("min", ri.getMin() != null ? ri.getMin() : 0);
+                indicator.add(ind);
+            }
+            radar.put("indicator", indicator);
+        } else if (categories != null) {
+            // 自动根据 categories 生成 indicator
             JSONArray indicator = new JSONArray();
             for (String category : categories) {
                 JSONObject ind = new JSONObject();
@@ -213,11 +230,10 @@ public class ChartFactory {
                 indicator.add(ind);
             }
             radar.put("indicator", indicator);
-            radar.put("center", new JSONArray().fluentAdd("50%").fluentAdd("55%"));
-            radar.put("radius", "60%");
         }
+        radar.put("center", new JSONArray().fluentAdd("50%").fluentAdd("55%"));
+        radar.put("radius", "60%");
         option.put("radar", radar);
-
         option.put("series", createSeriesList(result.getSeries(), "radar"));
 
         return option;
@@ -314,21 +330,57 @@ public class ChartFactory {
         return pieData;
     }
 
-    private static JSONArray createStackSeriesList(List<SeriesData> seriesList) {
-        JSONArray seriesArray = new JSONArray();
+    /**
+     * 校验并转换散点图数据格式
+     * 要求：series[].data 必须是 [[x1,y1], [x2,y2], ...] 格式
+     * @return 校验后的系列数据列表
+     */
+    private static JSONArray validateAndConvertScatterData(List<SeriesData> seriesList) {
+        JSONArray validatedSeries = new JSONArray();
         if (seriesList == null) {
-            return seriesArray;
+            return validatedSeries;
         }
 
         for (SeriesData seriesData : seriesList) {
             JSONObject series = new JSONObject();
             series.put("name", seriesData.getName());
-            series.put("type", "bar");
-            series.put("stack", "total");
-            series.put("label", new JSONObject().fluentPut("show", true).fluentPut("position", "insideRight"));
-            series.put("data", seriesData.getData());
-            seriesArray.add(series);
+            series.put("type", "scatter");
+
+            List<Object> originalData = seriesData.getData();
+            JSONArray validatedData = new JSONArray();
+
+            if (originalData != null) {
+                for (Object item : originalData) {
+                    // 每个数据点必须是 [x, y] 格式的数组或列表
+                    if (item instanceof List) {
+                        List<?> point = (List<?>) item;
+                        if (point.size() >= 2) {
+                            JSONArray validatedPoint = new JSONArray();
+                            validatedPoint.add(point.get(0));
+                            validatedPoint.add(point.get(1));
+                            validatedData.add(validatedPoint);
+                        } else {
+                            log.warn("散点图数据点格式错误：维度不足，已忽略: {}", item);
+                        }
+                    } else if (item instanceof Object[]) {
+                        Object[] point = (Object[]) item;
+                        if (point.length >= 2) {
+                            JSONArray validatedPoint = new JSONArray();
+                            validatedPoint.add(point[0]);
+                            validatedPoint.add(point[1]);
+                            validatedData.add(validatedPoint);
+                        } else {
+                            log.warn("散点图数据点格式错误：维度不足，已忽略: {}", item);
+                        }
+                    } else {
+                        log.warn("散点图数据格式错误：期望 [[x,y], [x,y], ...] 格式，实际收到: {}", item);
+                    }
+                }
+            }
+
+            series.put("data", validatedData);
+            validatedSeries.add(series);
         }
-        return seriesArray;
+        return validatedSeries;
     }
 }

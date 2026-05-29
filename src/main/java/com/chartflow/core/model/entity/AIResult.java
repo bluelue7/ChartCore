@@ -50,4 +50,30 @@ public class AIResult implements Serializable {
      * AI 分析结论
      */
     private String conclusion;
+
+    /**
+     * 雷达图指标配置（仅当 chartType = "radar" 时使用）
+     * 如果未提供，系统会根据 categories 自动生成
+     */
+    private List<RadarIndicator> radarIndicator;
+
+    /**
+     * 雷达图指标配置类
+     */
+    @Data
+    public static class RadarIndicator implements Serializable {
+        private static final long serialVersionUID = 1L;
+        /**
+         * 指标名称（通常与 categories 对应）
+         */
+        private String name;
+        /**
+         * 可选，最大值，默认自动计算
+         */
+        private Double max;
+        /**
+         * 可选，最小值，默认 0
+         */
+        private Double min;
+    }
 }

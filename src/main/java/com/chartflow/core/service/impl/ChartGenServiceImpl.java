@@ -2,6 +2,7 @@ package com.chartflow.core.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
 import com.chartflow.core.bizmq.BiMessageProducer;
+import com.chartflow.core.common.ErrorCode;
 import com.chartflow.core.config.ChartConfig;
 import com.chartflow.core.exception.ThrowUtils;
 import com.chartflow.core.factory.ChartFactory;
@@ -41,9 +42,9 @@ import java.util.concurrent.ThreadPoolExecutor;
 public class ChartGenServiceImpl implements ChartGenService {
 
     /**
-     * 文件大小限制（50MB）
+     * 文件大小限制（10MB）
      */
-    private static final long MAX_FILE_SIZE = 50 * 1024 * 1024L;
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024L;
 
     /**
      * 允许的文件后缀
@@ -656,26 +657,20 @@ public class ChartGenServiceImpl implements ChartGenService {
         String goal = request.getGoal();
         String name = request.getName();
         
-        ThrowUtils.throwIf(StringUtils.isBlank(goal), 
-                com.chartflow.core.common.ErrorCode.PARAMS_ERROR, "目标为空");
-        ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 100, 
-                com.chartflow.core.common.ErrorCode.PARAMS_ERROR, "名称过长");
+        ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "目标为空");
+        ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 100, ErrorCode.PARAMS_ERROR, "名称过长");
 
         // 文件校验
-        ThrowUtils.throwIf(file == null || file.isEmpty(), 
-                com.chartflow.core.common.ErrorCode.PARAMS_ERROR, "文件为空");
+        ThrowUtils.throwIf(file == null || file.isEmpty(), ErrorCode.PARAMS_ERROR, "文件为空");
         
         long size = file.getSize();
-        ThrowUtils.throwIf(size > MAX_FILE_SIZE, 
-                com.chartflow.core.common.ErrorCode.PARAMS_ERROR, "文件超过 50M");
+        ThrowUtils.throwIf(size > MAX_FILE_SIZE, ErrorCode.PARAMS_ERROR, "文件超过 10M");
 
         String originalFilename = file.getOriginalFilename();
-        ThrowUtils.throwIf(StringUtils.isBlank(originalFilename), 
-                com.chartflow.core.common.ErrorCode.PARAMS_ERROR, "文件名不能为空");
+        ThrowUtils.throwIf(StringUtils.isBlank(originalFilename), ErrorCode.PARAMS_ERROR, "文件名不能为空");
 
         String suffix = getFileSuffix(originalFilename);
-        ThrowUtils.throwIf(!VALID_FILE_SUFFIX_LIST.contains(suffix), 
-                com.chartflow.core.common.ErrorCode.PARAMS_ERROR, "文件后缀非法");
+        ThrowUtils.throwIf(!VALID_FILE_SUFFIX_LIST.contains(suffix), ErrorCode.PARAMS_ERROR, "文件后缀非法");
     }
 
     /**
